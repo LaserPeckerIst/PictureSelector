@@ -9,6 +9,8 @@ import com.luck.picture.lib.BuildConfig;
  */
 public final class PictureConfig {
 
+    public static final String SP_NAME = "PictureSpUtils";
+
     private static final String KEY = BuildConfig.LIBRARY_PACKAGE_NAME;
 
     public final static String EXTRA_RESULT_SELECTION = "extra_result_media";
@@ -50,7 +52,7 @@ public final class PictureConfig {
 
     public final static int CAMERA_BEFORE = 1;
 
-    public final static long MB = 1048576;
+
 
     public final static int DEFAULT_SPAN_COUNT = 4;
 
@@ -65,4 +67,5 @@ public final class PictureConfig {
     public final static int UNSET = -1;
 
     public final static int MODE_TYPE_SYSTEM_SOURCE = 1;
+    public final static int MODE_TYPE_EXTERNAL_PREVIEW_SOURCE = 2;
 }

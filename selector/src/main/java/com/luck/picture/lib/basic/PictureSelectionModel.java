@@ -16,26 +16,40 @@ import androidx.fragment.app.FragmentManager;
 import com.luck.picture.lib.PictureSelectorFragment;
 import com.luck.picture.lib.R;
 import com.luck.picture.lib.animators.AnimationType;
+import com.luck.picture.lib.config.FileSizeUnit;
 import com.luck.picture.lib.config.PictureConfig;
-import com.luck.picture.lib.config.PictureMimeType;
 import com.luck.picture.lib.config.PictureSelectionConfig;
 import com.luck.picture.lib.config.SelectMimeType;
 import com.luck.picture.lib.config.SelectModeConfig;
 import com.luck.picture.lib.config.VideoQuality;
 import com.luck.picture.lib.engine.CompressEngine;
+import com.luck.picture.lib.engine.CompressFileEngine;
 import com.luck.picture.lib.engine.CropEngine;
+import com.luck.picture.lib.engine.CropFileEngine;
 import com.luck.picture.lib.engine.ExtendLoaderEngine;
 import com.luck.picture.lib.engine.ImageEngine;
 import com.luck.picture.lib.engine.SandboxFileEngine;
+import com.luck.picture.lib.engine.UriToFileTransformEngine;
+import com.luck.picture.lib.engine.VideoPlayerEngine;
 import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.entity.LocalMediaFolder;
+import com.luck.picture.lib.interfaces.OnBitmapWatermarkEventListener;
 import com.luck.picture.lib.interfaces.OnCameraInterceptListener;
+import com.luck.picture.lib.interfaces.OnCustomLoadingListener;
+import com.luck.picture.lib.interfaces.OnGridItemSelectAnimListener;
 import com.luck.picture.lib.interfaces.OnInjectLayoutResourceListener;
 import com.luck.picture.lib.interfaces.OnMediaEditInterceptListener;
+import com.luck.picture.lib.interfaces.OnPermissionDeniedListener;
+import com.luck.picture.lib.interfaces.OnPermissionDescriptionListener;
 import com.luck.picture.lib.interfaces.OnPermissionsInterceptListener;
 import com.luck.picture.lib.interfaces.OnPreviewInterceptListener;
+import com.luck.picture.lib.interfaces.OnQueryFilterListener;
+import com.luck.picture.lib.interfaces.OnRecordAudioInterceptListener;
 import com.luck.picture.lib.interfaces.OnResultCallbackListener;
+import com.luck.picture.lib.interfaces.OnSelectAnimListener;
+import com.luck.picture.lib.interfaces.OnSelectFilterListener;
 import com.luck.picture.lib.interfaces.OnSelectLimitTipsListener;
+import com.luck.picture.lib.interfaces.OnVideoThumbnailEventListener;
 import com.luck.picture.lib.language.LanguageConfig;
 import com.luck.picture.lib.manager.SelectedManager;
 import com.luck.picture.lib.style.PictureSelectorStyle;
@@ -97,6 +111,17 @@ public final class PictureSelectionModel {
     }
 
     /**
+     * Set App default Language
+     *
+     * @param defaultLanguage default language {@link LanguageConfig}
+     * @return PictureSelectionModel
+     */
+    public PictureSelectionModel setDefaultLanguage(int defaultLanguage) {
+        selectionConfig.defaultLanguage = defaultLanguage;
+        return this;
+    }
+
+    /**
      * Image Load the engine
      *
      * @param engine Image Load the engine
@@ -106,9 +131,34 @@ public final class PictureSelectionModel {
      * @return
      */
     public PictureSelectionModel setImageEngine(ImageEngine engine) {
-        if (PictureSelectionConfig.imageEngine != engine) {
-            PictureSelectionConfig.imageEngine = engine;
-        }
+        PictureSelectionConfig.imageEngine = engine;
+        return this;
+    }
+
+    /**
+     * Set up player engine
+     *  <p>
+     *   Used to preview custom player instances，MediaPlayer by default
+     *  </p>
+     * @param engine
+     * @return
+     */
+    public PictureSelectionModel setVideoPlayerEngine(VideoPlayerEngine engine) {
+        PictureSelectionConfig.videoPlayerEngine = engine;
+        return this;
+    }
+
+    /**
+     * Image Compress the engine
+     *
+     * @param engine Image Compress the engine
+     * Please use {@link CompressFileEngine}
+     * @return
+     */
+    @Deprecated
+    public PictureSelectionModel setCompressEngine(CompressEngine engine) {
+        PictureSelectionConfig.compressEngine = engine;
+        selectionConfig.isCompressEngine = true;
         return this;
     }
 
@@ -118,13 +168,9 @@ public final class PictureSelectionModel {
      * @param engine Image Compress the engine
      * @return
      */
-    public PictureSelectionModel setCompressEngine(CompressEngine engine) {
-        if (PictureSelectionConfig.compressEngine != engine) {
-            PictureSelectionConfig.compressEngine = engine;
-            selectionConfig.isCompressEngine = true;
-        } else {
-            selectionConfig.isCompressEngine = false;
-        }
+    public PictureSelectionModel setCompressEngine(CompressFileEngine engine) {
+        PictureSelectionConfig.compressFileEngine = engine;
+        selectionConfig.isCompressEngine = true;
         return this;
     }
 
@@ -132,11 +178,42 @@ public final class PictureSelectionModel {
      * Image Crop the engine
      *
      * @param engine Image Crop the engine
+     * Please Use {@link CropFileEngine}
      * @return
      */
+    @Deprecated
     public PictureSelectionModel setCropEngine(CropEngine engine) {
-        if (PictureSelectionConfig.cropEngine != engine) {
-            PictureSelectionConfig.cropEngine = engine;
+        PictureSelectionConfig.cropEngine = engine;
+        return this;
+    }
+
+
+    /**
+     * Image Crop the engine
+     *
+     * @param engine Image Crop the engine
+     * @return
+     */
+    public PictureSelectionModel setCropEngine(CropFileEngine engine) {
+        PictureSelectionConfig.cropFileEngine = engine;
+        return this;
+    }
+
+    /**
+     * App Sandbox file path transform
+     *
+     * @param engine App Sandbox path transform
+     * Please Use {@link UriToFileTransformEngine}
+     * @return
+     *
+     */
+    @Deprecated
+    public PictureSelectionModel setSandboxFileEngine(SandboxFileEngine engine) {
+        if (SdkVersionUtils.isQ()) {
+            PictureSelectionConfig.sandboxFileEngine = engine;
+            selectionConfig.isSandboxFileEngine = true;
+        } else {
+            selectionConfig.isSandboxFileEngine = false;
         }
         return this;
     }
@@ -147,9 +224,9 @@ public final class PictureSelectionModel {
      * @param engine App Sandbox path transform
      * @return
      */
-    public PictureSelectionModel setSandboxFileEngine(SandboxFileEngine engine) {
-        if (SdkVersionUtils.isQ() && PictureSelectionConfig.sandboxFileEngine != engine) {
-            PictureSelectionConfig.sandboxFileEngine = engine;
+    public PictureSelectionModel setSandboxFileEngine(UriToFileTransformEngine engine) {
+        if (SdkVersionUtils.isQ()) {
+            PictureSelectionConfig.uriToFileTransformEngine = engine;
             selectionConfig.isSandboxFileEngine = true;
         } else {
             selectionConfig.isSandboxFileEngine = false;
@@ -157,27 +234,53 @@ public final class PictureSelectionModel {
         return this;
     }
 
-
     /**
      * Users can implement some interfaces to access their own query data
      * The premise is that you need to comply with the model specification of PictureSelector
      * {@link ExtendLoaderEngine}
      * {@link LocalMediaFolder}
      * {@link LocalMedia}
+     * <p>
+     * Use {@link #.setLoaderFactoryEngine();}
+     * </p>
      *
      * @param engine
      * @return
      */
+    @Deprecated
     public PictureSelectionModel setExtendLoaderEngine(ExtendLoaderEngine engine) {
-        if (PictureSelectionConfig.loaderDataEngine != engine) {
-            PictureSelectionConfig.loaderDataEngine = engine;
-            selectionConfig.isLoaderDataEngine = true;
-        } else {
-            selectionConfig.isLoaderDataEngine = false;
-        }
+        PictureSelectionConfig.loaderDataEngine = engine;
+        selectionConfig.isLoaderDataEngine = true;
         return this;
     }
 
+    /**
+     * Users can implement some interfaces to access their own query data
+     * The premise is that you need to comply with the model specification of PictureSelector
+     * {@link IBridgeLoaderFactory}
+     * {@link LocalMediaFolder}
+     * {@link LocalMedia}
+     *
+     * @param engine
+     * @return
+     */
+    public PictureSelectionModel setLoaderFactoryEngine(IBridgeLoaderFactory loaderFactory) {
+        PictureSelectionConfig.loaderFactory = loaderFactory;
+        selectionConfig.isLoaderFactoryEngine = true;
+        return this;
+    }
+
+    /**
+     * An interpolator defines the rate of change of an animation.
+     * This allows the basic animation effects (alpha, scale, translate, rotate) to be accelerated, decelerated, repeated, etc.
+     * Use {@link
+     * .isPreviewZoomEffect(true);
+     * }
+     */
+    public PictureSelectionModel setMagicalEffectInterpolator(InterpolatorFactory interpolatorFactory) {
+        PictureSelectionConfig.interpolatorFactory = interpolatorFactory;
+        return this;
+    }
 
     /**
      * Intercept camera click events, and users can implement their own camera framework
@@ -189,6 +292,19 @@ public final class PictureSelectionModel {
         PictureSelectionConfig.onCameraInterceptListener = listener;
         return this;
     }
+
+
+    /**
+     * Intercept Record Audio click events, and users can implement their own Record Audio framework
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setRecordAudioInterceptListener(OnRecordAudioInterceptListener listener) {
+        PictureSelectionConfig.onRecordAudioListener = listener;
+        return this;
+    }
+
 
     /**
      * Intercept preview click events, and users can implement their own preview framework
@@ -238,13 +354,115 @@ public final class PictureSelectionModel {
     }
 
     /**
-     * Custom limit tips
+     * permission description
      *
      * @param listener
      * @return
      */
+    public PictureSelectionModel setPermissionDescriptionListener(OnPermissionDescriptionListener listener) {
+        PictureSelectionConfig.onPermissionDescriptionListener = listener;
+        return this;
+    }
+
+    /**
+     *  Permission denied
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setPermissionDeniedListener(OnPermissionDeniedListener listener) {
+        PictureSelectionConfig.onPermissionDeniedListener = listener;
+        return this;
+    }
+
+    /**
+     * Custom limit tips
+     *
+     * @param listener
+     */
     public PictureSelectionModel setSelectLimitTipsListener(OnSelectLimitTipsListener listener) {
         PictureSelectionConfig.onSelectLimitTipsListener = listener;
+        return this;
+    }
+
+    /**
+     * You need to filter out the content that does not meet the selection criteria
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setSelectFilterListener(OnSelectFilterListener listener) {
+        PictureSelectionConfig.onSelectFilterListener = listener;
+        return this;
+    }
+
+    /**
+     * You need to filter out what doesn't meet the standards
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setQueryFilterListener(OnQueryFilterListener listener) {
+        PictureSelectionConfig.onQueryFilterListener = listener;
+        return this;
+    }
+
+    /**
+     * Animate the selected item in the list
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setGridItemSelectAnimListener(OnGridItemSelectAnimListener listener) {
+        PictureSelectionConfig.onItemSelectAnimListener = listener;
+        return this;
+    }
+
+    /**
+     * Animate the selected item
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setSelectAnimListener(OnSelectAnimListener listener) {
+        PictureSelectionConfig.onSelectAnimListener = listener;
+        return this;
+    }
+
+    /**
+     * You can add a watermark to the image
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setAddBitmapWatermarkListener(OnBitmapWatermarkEventListener listener) {
+        if (selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
+            PictureSelectionConfig.onBitmapWatermarkListener = listener;
+        }
+        return this;
+    }
+
+    /**
+     * Process video thumbnails
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setVideoThumbnailListener(OnVideoThumbnailEventListener listener) {
+        if (selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
+            PictureSelectionConfig.onVideoThumbnailEventListener = listener;
+        }
+        return this;
+    }
+
+    /**
+     * Custom show loading dialog
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionModel setCustomLoadingListener(OnCustomLoadingListener listener) {
+        PictureSelectionConfig.onCustomLoadingListener = listener;
         return this;
     }
 
@@ -257,6 +475,19 @@ public final class PictureSelectionModel {
      */
     public PictureSelectionModel isCameraForegroundService(boolean isForeground) {
         selectionConfig.isCameraForegroundService = isForeground;
+        return this;
+    }
+
+    /**
+     * Android 10 preloads data first, then asynchronously obtains album list
+     * <p>
+     * Please consult the developer for detailed reasons
+     * </p>
+     *
+     * @param isPreloadFirst Enable preload by default
+     */
+    public PictureSelectionModel isPreloadFirst(boolean isPreloadFirst) {
+        selectionConfig.isPreloadFirst = isPreloadFirst;
         return this;
     }
 
@@ -306,7 +537,7 @@ public final class PictureSelectionModel {
     /**
      * Choose between photographing and shooting in ofAll mode
      *
-     * @param ofAllCameraType {@link PictureMimeType.ofImage or PictureMimeType.ofVideo}
+     * @param ofAllCameraType {@link SelectMimeType.ofImage or SelectMimeType.ofVideo}
      *                        The default is ofAll() mode
      * @return
      */
@@ -453,6 +684,16 @@ public final class PictureSelectionModel {
         return this;
     }
 
+    /**
+     * View lifecycle listener
+     *
+     * @param viewLifecycle
+     * @return
+     */
+    public PictureSelectionModel setAttachViewLifecycle(IBridgeViewLifecycle viewLifecycle) {
+        PictureSelectionConfig.viewLifecycle = viewLifecycle;
+        return this;
+    }
 
     /**
      * The video quality output mode is only for system recording, and there are only two modes: poor quality or high quality
@@ -470,6 +711,16 @@ public final class PictureSelectionModel {
         return this;
     }
 
+    /**
+     * Set the first default album name
+     *
+     * @param defaultAlbumName
+     * @return
+     */
+    public PictureSelectionModel setDefaultAlbumName(String defaultAlbumName) {
+        selectionConfig.defaultAlbumName = defaultAlbumName;
+        return this;
+    }
 
     /**
      * camera output image format
@@ -760,10 +1011,10 @@ public final class PictureSelectionModel {
      * @return
      */
     public PictureSelectionModel setFilterMaxFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.filterMaxFileSize = fileKbSize;
         } else {
-            selectionConfig.filterMaxFileSize = fileKbSize * 1024;
+            selectionConfig.filterMaxFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -775,10 +1026,10 @@ public final class PictureSelectionModel {
      * @return
      */
     public PictureSelectionModel setFilterMinFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.filterMinFileSize = fileKbSize;
         } else {
-            selectionConfig.filterMinFileSize = fileKbSize * 1024;
+            selectionConfig.filterMinFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -791,10 +1042,10 @@ public final class PictureSelectionModel {
      * @return
      */
     public PictureSelectionModel setSelectMaxFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.selectMaxFileSize = fileKbSize;
         } else {
-            selectionConfig.selectMaxFileSize = fileKbSize * 1024;
+            selectionConfig.selectMaxFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -806,10 +1057,10 @@ public final class PictureSelectionModel {
      * @return
      */
     public PictureSelectionModel setSelectMinFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.selectMinFileSize = fileKbSize;
         } else {
-            selectionConfig.selectMinFileSize = fileKbSize * 1024;
+            selectionConfig.selectMinFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -912,6 +1163,28 @@ public final class PictureSelectionModel {
     }
 
     /**
+     * It is forbidden to correct or synchronize the width and height of the video
+     *
+     * @param isEnableVideoSize Use {@link .isSyncWidthAndHeight()}
+     */
+    @Deprecated
+    public PictureSelectionModel isEnableVideoSize(boolean isEnableVideoSize) {
+        selectionConfig.isSyncWidthAndHeight = isEnableVideoSize;
+        return this;
+    }
+
+    /**
+     * It is forbidden to correct or synchronize the width and height of the video
+     *
+     * @param isSyncWidthAndHeight
+     * @return
+     */
+    public PictureSelectionModel isSyncWidthAndHeight(boolean isSyncWidthAndHeight) {
+        selectionConfig.isSyncWidthAndHeight = isSyncWidthAndHeight;
+        return this;
+    }
+
+    /**
      * Do you want to preview play the audio file?
      *
      * @param isPreviewAudio
@@ -938,6 +1211,71 @@ public final class PictureSelectionModel {
      */
     public PictureSelectionModel isPreviewVideo(boolean isPreviewVideo) {
         selectionConfig.isEnablePreviewVideo = isPreviewVideo;
+        return this;
+    }
+
+    /**
+     * Whether to play video automatically when previewing
+     *
+     * @param isAutoPlay
+     * @return
+     */
+    public PictureSelectionModel isAutoVideoPlay(boolean isAutoPlay) {
+        selectionConfig.isAutoVideoPlay = isAutoPlay;
+        return this;
+    }
+
+    /**
+     * loop video
+     *
+     * @param isLoopAutoPlay
+     * @return
+     */
+    public PictureSelectionModel isLoopAutoVideoPlay(boolean isLoopAutoPlay) {
+        selectionConfig.isLoopAutoPlay = isLoopAutoPlay;
+        return this;
+    }
+
+    /**
+     * The video supports pause and resume
+     *
+     * @param isPauseResumePlay
+     * @return
+     */
+    public PictureSelectionModel isVideoPauseResumePlay(boolean isPauseResumePlay) {
+        selectionConfig.isPauseResumePlay = isPauseResumePlay;
+        return this;
+    }
+
+    /**
+     * Whether to sync the number of resources under the latest album in paging mode with filter conditions
+     *
+     * @param isPageSyncAsCount
+     */
+    public PictureSelectionModel isPageSyncAlbumCount(boolean isPageSyncAsCount) {
+        selectionConfig.isPageSyncAsCount = isPageSyncAsCount;
+        return this;
+    }
+
+    /**
+     * Select original image to skip compression
+     *
+     * @param isOriginalSkipCompress
+     * @return
+     */
+    public PictureSelectionModel isOriginalSkipCompress(boolean isOriginalSkipCompress) {
+        selectionConfig.isOriginalSkipCompress = isOriginalSkipCompress;
+        return this;
+    }
+
+    /**
+     * Filter the validity of file size or duration of audio and video
+     *
+     * @param isFilterSizeDuration
+     * @return
+     */
+    public PictureSelectionModel isFilterSizeDuration(boolean isFilterSizeDuration) {
+        selectionConfig.isFilterSizeDuration = isFilterSizeDuration;
         return this;
     }
 
@@ -978,6 +1316,14 @@ public final class PictureSelectionModel {
      */
     public PictureSelectionModel isCameraRotateImage(boolean isCameraRotateImage) {
         selectionConfig.isCameraRotateImage = isCameraRotateImage;
+        return this;
+    }
+
+    /**
+     * Zoom animation is required when selecting an asset
+     */
+    public PictureSelectionModel isSelectZoomAnim(boolean isSelectZoomAnim) {
+        selectionConfig.isSelectZoomAnim = isSelectZoomAnim;
         return this;
     }
 
@@ -1027,7 +1373,7 @@ public final class PictureSelectionModel {
             selectionConfig.isResultListenerBack = true;
             selectionConfig.isActivityResultBack = false;
             PictureSelectionConfig.onResultCallListener = call;
-            if (PictureSelectionConfig.imageEngine == null) {
+            if (PictureSelectionConfig.imageEngine == null && selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
                 throw new NullPointerException("imageEngine is null,Please implement ImageEngine");
             }
             Intent intent = new Intent(activity, PictureSelectorSupporterActivity.class);
@@ -1051,7 +1397,7 @@ public final class PictureSelectionModel {
             }
             selectionConfig.isResultListenerBack = false;
             selectionConfig.isActivityResultBack = true;
-            if (PictureSelectionConfig.imageEngine == null) {
+            if (PictureSelectionConfig.imageEngine == null && selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
                 throw new NullPointerException("imageEngine is null,Please implement ImageEngine");
             }
             Intent intent = new Intent(activity, PictureSelectorSupporterActivity.class);
@@ -1083,7 +1429,7 @@ public final class PictureSelectionModel {
             }
             selectionConfig.isResultListenerBack = false;
             selectionConfig.isActivityResultBack = true;
-            if (PictureSelectionConfig.imageEngine == null) {
+            if (PictureSelectionConfig.imageEngine == null && selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
                 throw new NullPointerException("imageEngine is null,Please implement ImageEngine");
             }
             Intent intent = new Intent(activity, PictureSelectorSupporterActivity.class);

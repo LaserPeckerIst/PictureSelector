@@ -13,19 +13,29 @@ import androidx.fragment.app.FragmentManager;
 
 import com.luck.picture.lib.PictureOnlyCameraFragment;
 import com.luck.picture.lib.R;
-import com.luck.picture.lib.config.PictureConfig;
-import com.luck.picture.lib.config.PictureMimeType;
+import com.luck.picture.lib.config.FileSizeUnit;
 import com.luck.picture.lib.config.PictureSelectionConfig;
+import com.luck.picture.lib.config.SelectMimeType;
 import com.luck.picture.lib.config.SelectModeConfig;
 import com.luck.picture.lib.config.VideoQuality;
 import com.luck.picture.lib.engine.CompressEngine;
+import com.luck.picture.lib.engine.CompressFileEngine;
 import com.luck.picture.lib.engine.CropEngine;
+import com.luck.picture.lib.engine.CropFileEngine;
 import com.luck.picture.lib.engine.SandboxFileEngine;
+import com.luck.picture.lib.engine.UriToFileTransformEngine;
 import com.luck.picture.lib.entity.LocalMedia;
+import com.luck.picture.lib.interfaces.OnBitmapWatermarkEventListener;
 import com.luck.picture.lib.interfaces.OnCameraInterceptListener;
+import com.luck.picture.lib.interfaces.OnCustomLoadingListener;
+import com.luck.picture.lib.interfaces.OnPermissionDeniedListener;
+import com.luck.picture.lib.interfaces.OnPermissionDescriptionListener;
 import com.luck.picture.lib.interfaces.OnPermissionsInterceptListener;
+import com.luck.picture.lib.interfaces.OnRecordAudioInterceptListener;
 import com.luck.picture.lib.interfaces.OnResultCallbackListener;
 import com.luck.picture.lib.interfaces.OnSelectLimitTipsListener;
+import com.luck.picture.lib.interfaces.OnVideoThumbnailEventListener;
+import com.luck.picture.lib.language.LanguageConfig;
 import com.luck.picture.lib.manager.SelectedManager;
 import com.luck.picture.lib.utils.DoubleUtils;
 import com.luck.picture.lib.utils.SdkVersionUtils;
@@ -53,6 +63,41 @@ public final class PictureSelectionCameraModel {
         selectionConfig.isOpenClickSound = false;
     }
 
+    /**
+     * Set App Language
+     *
+     * @param language {@link LanguageConfig}
+     * @return PictureSelectionModel
+     */
+    public PictureSelectionCameraModel setLanguage(int language) {
+        selectionConfig.language = language;
+        return this;
+    }
+
+    /**
+     * Set App default Language
+     *
+     * @param defaultLanguage default language {@link LanguageConfig}
+     * @return PictureSelectionModel
+     */
+    public PictureSelectionCameraModel setDefaultLanguage(int defaultLanguage) {
+        selectionConfig.defaultLanguage = defaultLanguage;
+        return this;
+    }
+
+    /**
+     * Image Compress the engine
+     *
+     * @param engine Image Compress the engine
+     * Please use {@link CompressFileEngine}
+     * @return
+     */
+    @Deprecated
+    public PictureSelectionCameraModel setCompressEngine(CompressEngine engine) {
+        PictureSelectionConfig.compressEngine = engine;
+        selectionConfig.isCompressEngine = true;
+        return this;
+    }
 
     /**
      * Image Compress the engine
@@ -60,13 +105,22 @@ public final class PictureSelectionCameraModel {
      * @param engine Image Compress the engine
      * @return
      */
-    public PictureSelectionCameraModel setCompressEngine(CompressEngine engine) {
-        if (PictureSelectionConfig.compressEngine != engine) {
-            PictureSelectionConfig.compressEngine = engine;
-            selectionConfig.isCompressEngine = true;
-        } else {
-            selectionConfig.isCompressEngine = false;
-        }
+    public PictureSelectionCameraModel setCompressEngine(CompressFileEngine engine) {
+        PictureSelectionConfig.compressFileEngine = engine;
+        selectionConfig.isCompressEngine = true;
+        return this;
+    }
+
+    /**
+     * Image Crop the engine
+     *
+     * @param engine Image Crop the engine
+     * Please Use {@link CropFileEngine}
+     * @return
+     */
+    @Deprecated
+    public PictureSelectionCameraModel setCropEngine(CropEngine engine) {
+        PictureSelectionConfig.cropEngine = engine;
         return this;
     }
 
@@ -76,9 +130,25 @@ public final class PictureSelectionCameraModel {
      * @param engine Image Crop the engine
      * @return
      */
-    public PictureSelectionCameraModel setCropEngine(CropEngine engine) {
-        if (PictureSelectionConfig.cropEngine != engine) {
-            PictureSelectionConfig.cropEngine = engine;
+    public PictureSelectionCameraModel setCropEngine(CropFileEngine engine) {
+        PictureSelectionConfig.cropFileEngine = engine;
+        return this;
+    }
+
+    /**
+     * App Sandbox file path transform
+     *
+     * @param engine App Sandbox path transform
+     * Please Use {@link UriToFileTransformEngine}
+     * @return
+     */
+    @Deprecated
+    public PictureSelectionCameraModel setSandboxFileEngine(SandboxFileEngine engine) {
+        if (SdkVersionUtils.isQ()) {
+            PictureSelectionConfig.sandboxFileEngine = engine;
+            selectionConfig.isSandboxFileEngine = true;
+        } else {
+            selectionConfig.isSandboxFileEngine = false;
         }
         return this;
     }
@@ -89,9 +159,9 @@ public final class PictureSelectionCameraModel {
      * @param engine App Sandbox path transform
      * @return
      */
-    public PictureSelectionCameraModel setSandboxFileEngine(SandboxFileEngine engine) {
-        if (SdkVersionUtils.isQ() && PictureSelectionConfig.sandboxFileEngine != engine) {
-            PictureSelectionConfig.sandboxFileEngine = engine;
+    public PictureSelectionCameraModel setSandboxFileEngine(UriToFileTransformEngine engine) {
+        if (SdkVersionUtils.isQ()) {
+            PictureSelectionConfig.uriToFileTransformEngine = engine;
             selectionConfig.isSandboxFileEngine = true;
         } else {
             selectionConfig.isSandboxFileEngine = false;
@@ -110,6 +180,16 @@ public final class PictureSelectionCameraModel {
         return this;
     }
 
+    /**
+     * Intercept Record Audio click events, and users can implement their own Record Audio framework
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionCameraModel setRecordAudioInterceptListener(OnRecordAudioInterceptListener listener) {
+        PictureSelectionConfig.onRecordAudioListener = listener;
+        return this;
+    }
 
     /**
      * Custom interception permission processing
@@ -123,13 +203,71 @@ public final class PictureSelectionCameraModel {
     }
 
     /**
-     * Custom limit tips
+     * permission description
      *
      * @param listener
      * @return
      */
+    public PictureSelectionCameraModel setPermissionDescriptionListener(OnPermissionDescriptionListener listener) {
+        PictureSelectionConfig.onPermissionDescriptionListener = listener;
+        return this;
+    }
+
+    /**
+     *  Permission denied
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionCameraModel setPermissionDeniedListener(OnPermissionDeniedListener listener) {
+        PictureSelectionConfig.onPermissionDeniedListener = listener;
+        return this;
+    }
+
+    /**
+     * Custom limit tips
+     *
+     * @param listener
+     */
     public PictureSelectionCameraModel setSelectLimitTipsListener(OnSelectLimitTipsListener listener) {
         PictureSelectionConfig.onSelectLimitTipsListener = listener;
+        return this;
+    }
+
+    /**
+     * You can add a watermark to the image
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionCameraModel setAddBitmapWatermarkListener(OnBitmapWatermarkEventListener listener) {
+        if (selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
+            PictureSelectionConfig.onBitmapWatermarkListener = listener;
+        }
+        return this;
+    }
+
+    /**
+     * Process video thumbnails
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionCameraModel setVideoThumbnailListener(OnVideoThumbnailEventListener listener) {
+        if (selectionConfig.chooseMode != SelectMimeType.ofAudio()) {
+            PictureSelectionConfig.onVideoThumbnailEventListener = listener;
+        }
+        return this;
+    }
+
+    /**
+     * Custom show loading dialog
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionCameraModel setCustomLoadingListener(OnCustomLoadingListener listener) {
+        PictureSelectionConfig.onCustomLoadingListener = listener;
         return this;
     }
 
@@ -148,7 +286,7 @@ public final class PictureSelectionCameraModel {
     /**
      * Choose between photographing and shooting in ofAll mode
      *
-     * @param ofAllCameraType {@link PictureMimeType.ofImage or PictureMimeType.ofVideo}
+     * @param ofAllCameraType {@link SelectMimeType.ofImage or SelectMimeType.ofVideo}
      *                        The default is ofAll() mode
      * @return
      */
@@ -170,6 +308,17 @@ public final class PictureSelectionCameraModel {
     public PictureSelectionCameraModel isOriginalControl(boolean isOriginalControl) {
         selectionConfig.isOriginalControl = isOriginalControl;
         selectionConfig.isCheckOriginalImage = isOriginalControl;
+        return this;
+    }
+
+    /**
+     * Select original image to skip compression
+     *
+     * @param isOriginalSkipCompress
+     * @return
+     */
+    public PictureSelectionCameraModel isOriginalSkipCompress(boolean isOriginalSkipCompress) {
+        selectionConfig.isOriginalSkipCompress = isOriginalSkipCompress;
         return this;
     }
 
@@ -197,10 +346,10 @@ public final class PictureSelectionCameraModel {
      * @return
      */
     public PictureSelectionCameraModel setSelectMaxFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.selectMaxFileSize = fileKbSize;
         } else {
-            selectionConfig.selectMaxFileSize = fileKbSize * 1024;
+            selectionConfig.selectMaxFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -212,10 +361,10 @@ public final class PictureSelectionCameraModel {
      * @return
      */
     public PictureSelectionCameraModel setSelectMinFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.selectMinFileSize = fileKbSize;
         } else {
-            selectionConfig.selectMinFileSize = fileKbSize * 1024;
+            selectionConfig.selectMinFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -556,6 +705,9 @@ public final class PictureSelectionCameraModel {
 
     /**
      * Start PictureSelector
+     * <p>
+     * If you are in the Navigation Fragment scene, you must use this method
+     * </p>
      *
      * @param requestCode
      */
@@ -580,6 +732,9 @@ public final class PictureSelectionCameraModel {
 
     /**
      * ActivityResultLauncher PictureSelector
+     * <p>
+     *     If you are in the Navigation Fragment scene, you must use this method
+     * </p>
      *
      * @param launcher use {@link Activity.registerForActivityResult( ActivityResultContract , ActivityResultCallback )}
      */
@@ -602,6 +757,9 @@ public final class PictureSelectionCameraModel {
 
     /**
      * Start PictureSelector
+     * <p>
+     * If you are in the Navigation Fragment scene, you must use this method
+     * </>
      *
      * @param call
      */

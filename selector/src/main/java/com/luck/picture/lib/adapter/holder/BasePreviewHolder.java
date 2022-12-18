@@ -1,6 +1,5 @@
 package com.luck.picture.lib.adapter.holder;
 
-import android.graphics.Bitmap;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,10 +11,8 @@ import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.luck.picture.lib.R;
-import com.luck.picture.lib.config.PictureMimeType;
 import com.luck.picture.lib.config.PictureSelectionConfig;
 import com.luck.picture.lib.entity.LocalMedia;
-import com.luck.picture.lib.interfaces.OnCallbackListener;
 import com.luck.picture.lib.photoview.OnViewTapListener;
 import com.luck.picture.lib.photoview.PhotoView;
 import com.luck.picture.lib.utils.BitmapUtils;
@@ -27,7 +24,7 @@ import com.luck.picture.lib.utils.MediaUtils;
  * @date：2021/11/20 3:17 下午
  * @describe：BasePreviewHolder
  */
-public class BasePreviewHolder extends RecyclerView.ViewHolder {
+public abstract class BasePreviewHolder extends RecyclerView.ViewHolder {
     /**
      * 图片
      */
@@ -66,12 +63,35 @@ public class BasePreviewHolder extends RecyclerView.ViewHolder {
         this.screenWidth = DensityUtil.getRealScreenWidth(itemView.getContext());
         this.screenHeight = DensityUtil.getScreenHeight(itemView.getContext());
         this.screenAppInHeight = DensityUtil.getRealScreenHeight(itemView.getContext());
+        this.coverImageView = itemView.findViewById(R.id.preview_image);
         findViews(itemView);
     }
 
-    protected void findViews(View itemView) {
-        this.coverImageView = itemView.findViewById(R.id.preview_image);
-    }
+    /**
+     * findViews
+     *
+     * @param itemView
+     */
+    protected abstract void findViews(View itemView);
+
+    /**
+     * load image cover
+     *
+     * @param media
+     * @param maxWidth
+     * @param maxHeight
+     */
+    protected abstract void loadImage(final LocalMedia media, int maxWidth, int maxHeight);
+
+    /**
+     * 点击返回事件
+     */
+    protected abstract void onClickBackPressed();
+
+    /**
+     * 长按事件
+     */
+    protected abstract void onLongPressDownload(LocalMedia media);
 
     /**
      * bind Data
@@ -81,87 +101,16 @@ public class BasePreviewHolder extends RecyclerView.ViewHolder {
      */
     public void bindData(LocalMedia media, int position) {
         this.media = media;
-        int[] size = getSize(media);
+        int[] size = getRealSizeFromMedia(media);
         int[] maxImageSize = BitmapUtils.getMaxImageSize(size[0], size[1]);
-        loadImageBitmap(media, maxImageSize[0], maxImageSize[1]);
+        loadImage(media, maxImageSize[0], maxImageSize[1]);
         setScaleDisplaySize(media);
-        setOnClickEventListener();
-        setOnLongClickEventListener();
+        setCoverScaleType(media);
+        onClickBackPressed();
+        onLongPressDownload(media);
     }
 
-    protected void setOnClickEventListener() {
-        coverImageView.setOnViewTapListener(new OnViewTapListener() {
-            @Override
-            public void onViewTap(View view, float x, float y) {
-                if (mPreviewEventListener != null) {
-                    mPreviewEventListener.onBackPressed();
-                }
-            }
-        });
-    }
-
-    protected void setOnLongClickEventListener() {
-        coverImageView.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View view) {
-                if (mPreviewEventListener != null) {
-                    mPreviewEventListener.onLongPressDownload(media);
-                }
-                return false;
-            }
-        });
-    }
-
-    protected void loadImageBitmap(final LocalMedia media, int maxWidth, int maxHeight) {
-        String path = media.getAvailablePath();
-        PictureSelectionConfig.imageEngine.loadImageBitmap(itemView.getContext(), path, maxWidth, maxHeight,
-                new OnCallbackListener<Bitmap>() {
-                    @Override
-                    public void onCall(Bitmap bitmap) {
-                        loadBitmapCallback(media, bitmap);
-                    }
-                });
-    }
-
-    protected void loadBitmapCallback(LocalMedia media, Bitmap bitmap) {
-        String path = media.getAvailablePath();
-        if (bitmap == null) {
-            mPreviewEventListener.onLoadError();
-        } else {
-            boolean isHasWebp = PictureMimeType.isHasWebp(media.getMimeType()) || PictureMimeType.isUrlHasWebp(path);
-            boolean isHasGif = PictureMimeType.isUrlHasGif(path) || PictureMimeType.isHasGif(media.getMimeType());
-            if (isHasWebp || isHasGif) {
-                PictureSelectionConfig.imageEngine.loadImage(itemView.getContext(), path, coverImageView);
-            } else {
-                setImageViewBitmap(bitmap);
-            }
-            int width, height;
-            ImageView.ScaleType scaleType;
-            if (MediaUtils.isLongImage(bitmap.getWidth(), bitmap.getHeight())) {
-                scaleType = ImageView.ScaleType.CENTER_CROP;
-                width = screenWidth;
-                height = screenHeight;
-            } else {
-                scaleType = ImageView.ScaleType.FIT_CENTER;
-                int[] size = getSize(media);
-                boolean isHaveSize = bitmap.getWidth() > 0 && bitmap.getHeight() > 0;
-                width = isHaveSize ? bitmap.getWidth() : size[0];
-                height = isHaveSize ? bitmap.getHeight() : size[1];
-            }
-            mPreviewEventListener.onLoadComplete(width, height, new OnCallbackListener<Boolean>() {
-                @Override
-                public void onCall(Boolean isBeginEffect) {
-                    coverImageView.setScaleType(isBeginEffect ? ImageView.ScaleType.CENTER_CROP : scaleType);
-                }
-            });
-        }
-    }
-
-    protected void setImageViewBitmap(Bitmap bitmap) {
-        coverImageView.setImageBitmap(bitmap);
-    }
-
-    protected int[] getSize(LocalMedia media) {
+    protected int[] getRealSizeFromMedia(LocalMedia media) {
         if (media.isCut() && media.getCropImageWidth() > 0 && media.getCropImageHeight() > 0) {
             return new int[]{media.getCropImageWidth(), media.getCropImageHeight()};
         } else {
@@ -169,14 +118,22 @@ public class BasePreviewHolder extends RecyclerView.ViewHolder {
         }
     }
 
+    protected void setCoverScaleType(LocalMedia media) {
+        if (MediaUtils.isLongImage(media.getWidth(), media.getHeight())) {
+            coverImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        } else {
+            coverImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        }
+    }
+
     protected void setScaleDisplaySize(LocalMedia media) {
         if (!config.isPreviewZoomEffect && screenWidth < screenHeight) {
-            float ratio = (float) media.getWidth() / (float) media.getHeight();
-            int displayHeight = (int) (screenWidth / ratio);
-            FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) coverImageView.getLayoutParams();
-            layoutParams.width = screenWidth;
-            layoutParams.height = displayHeight > screenHeight ? screenAppInHeight : screenHeight;
-            layoutParams.gravity = Gravity.CENTER;
+            if (media.getWidth() > 0 && media.getHeight() > 0) {
+                FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) coverImageView.getLayoutParams();
+                layoutParams.width = screenWidth;
+                layoutParams.height = screenAppInHeight;
+                layoutParams.gravity = Gravity.CENTER;
+            }
         }
     }
 
@@ -201,10 +158,6 @@ public class BasePreviewHolder extends RecyclerView.ViewHolder {
     }
 
     public interface OnPreviewEventListener {
-
-        void onLoadComplete(int width, int height, OnCallbackListener<Boolean> call);
-
-        void onLoadError();
 
         void onBackPressed();
 

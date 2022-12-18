@@ -1,13 +1,7 @@
 package com.luck.picture.lib.engine;
 
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.widget.ImageView;
-
-import androidx.annotation.NonNull;
-
-import com.luck.picture.lib.interfaces.OnCallbackListener;
-
 /**
  * @author：luck
  * @date：2019-11-13 16:59
@@ -21,19 +15,18 @@ public interface ImageEngine {
      * @param url
      * @param imageView
      */
-    void loadImage(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView);
+    void loadImage(Context context, String url, ImageView imageView);
 
     /**
-     * load image bitmap
+     * load image
      *
      * @param context
+     * @param imageView
      * @param url
      * @param maxWidth
      * @param maxHeight
-     * @param call
      */
-    void loadImageBitmap(@NonNull Context context, @NonNull String url, int maxWidth, int maxHeight,
-                         OnCallbackListener<Bitmap> call);
+    void loadImage(Context context, ImageView imageView, String url, int maxWidth, int maxHeight);
 
     /**
      * load album cover
@@ -42,7 +35,7 @@ public interface ImageEngine {
      * @param url
      * @param imageView
      */
-    void loadAlbumCover(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView);
+    void loadAlbumCover(Context context, String url, ImageView imageView);
 
     /**
      * load picture list picture
@@ -51,7 +44,7 @@ public interface ImageEngine {
      * @param url
      * @param imageView
      */
-    void loadGridImage(@NonNull Context context, @NonNull String url, @NonNull ImageView imageView);
+    void loadGridImage(Context context, String url, ImageView imageView);
 
     /**
      * When the recyclerview slides quickly, the callback can be used to pause the loading of resources

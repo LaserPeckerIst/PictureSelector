@@ -1,6 +1,5 @@
 package com.luck.picture.lib.loader;
 
-import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
@@ -9,6 +8,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.luck.picture.lib.R;
+import com.luck.picture.lib.config.FileSizeUnit;
 import com.luck.picture.lib.config.PictureConfig;
 import com.luck.picture.lib.config.PictureMimeType;
 import com.luck.picture.lib.config.PictureSelectionConfig;
@@ -41,10 +41,6 @@ import java.util.Set;
  */
 public final class LocalMediaPageLoader extends IBridgeMediaLoader {
 
-    public LocalMediaPageLoader(Context context, PictureSelectionConfig config) {
-        this.mContext = context;
-        this.config = config;
-    }
 
     /**
      * Query conditions in all modes
@@ -54,13 +50,13 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
      * @param queryMimeTypeOptions
      * @return
      */
-    private static String getSelectionArgsForAllMediaCondition(String timeCondition, String sizeCondition, String queryMimeTypeOptions) {
+    private String getSelectionArgsForAllMediaCondition(String timeCondition, String sizeCondition, String queryMimeTypeOptions) {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?")
                 .append(queryMimeTypeOptions).append(" OR ")
                 .append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=? AND ").append(timeCondition).append(") AND ")
                 .append(sizeCondition);
-        if (SdkVersionUtils.isQ()) {
+        if (isWithAllQuery()) {
             return stringBuilder.toString();
         } else {
             return stringBuilder.append(")").append(GROUP_BY_BUCKET_Id).toString();
@@ -70,13 +66,13 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
     /**
      * Query conditions in image modes
      *
-     * @param queryMimeTypeOptions
      * @param fileSizeCondition
+     * @param queryMimeTypeOptions
      * @return
      */
-    private static String getSelectionArgsForImageMediaCondition(String queryMimeTypeOptions, String fileSizeCondition) {
+    private String getSelectionArgsForImageMediaCondition(String fileSizeCondition, String queryMimeTypeOptions) {
         StringBuilder stringBuilder = new StringBuilder();
-        if (SdkVersionUtils.isQ()) {
+        if (isWithAllQuery()) {
             return stringBuilder.append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?")
                     .append(queryMimeTypeOptions).append(" AND ").append(fileSizeCondition).toString();
         } else {
@@ -87,18 +83,34 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
     }
 
     /**
-     * Video or Audio mode conditions
+     * Video mode conditions
      *
-     * @param queryMimeTypeOptions
-     * @param fileSizeCondition
+     * @param durationCondition
+     * @param queryMimeCondition
      * @return
      */
-    private static String getSelectionArgsForVideoOrAudioMediaCondition(String queryMimeTypeOptions, String fileSizeCondition) {
+    private String getSelectionArgsForVideoMediaCondition(String durationCondition, String queryMimeCondition) {
         StringBuilder stringBuilder = new StringBuilder();
-        if (SdkVersionUtils.isQ()) {
-            return stringBuilder.append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeTypeOptions).append(" AND ").append(fileSizeCondition).toString();
+        if (isWithAllQuery()) {
+            return stringBuilder.append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeCondition).append(" AND ").append(durationCondition).toString();
         } else {
-            return stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeTypeOptions).append(") AND ").append(fileSizeCondition).append(")").append(GROUP_BY_BUCKET_Id).toString();
+            return stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeCondition).append(") AND ").append(durationCondition).append(")").append(GROUP_BY_BUCKET_Id).toString();
+        }
+    }
+
+    /**
+     * Audio mode conditions
+     *
+     * @param durationCondition
+     * @param queryMimeCondition
+     * @return
+     */
+    private String getSelectionArgsForAudioMediaCondition(String durationCondition, String queryMimeCondition) {
+        StringBuilder stringBuilder = new StringBuilder();
+        if (isWithAllQuery()) {
+            return stringBuilder.append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeCondition).append(" AND ").append(durationCondition).toString();
+        } else {
+            return stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeCondition).append(") AND ").append(durationCondition).append(")").append(GROUP_BY_BUCKET_Id).toString();
         }
     }
 
@@ -109,43 +121,22 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
      * @return
      */
     private static String[] getSelectionArgsForPageSingleMediaType(int mediaType, long bucketId) {
-        return bucketId == -1 ? new String[]{String.valueOf(mediaType)} : new String[]{String.valueOf(mediaType), ValueOf.toString(bucketId)};
+        return bucketId == PictureConfig.ALL ? new String[]{String.valueOf(mediaType)} : new String[]{String.valueOf(mediaType), ValueOf.toString(bucketId)};
     }
 
-    private static final String[] PROJECTION_29 = {
-            MediaStore.Files.FileColumns._ID,
-            COLUMN_BUCKET_ID,
-            COLUMN_BUCKET_DISPLAY_NAME,
-            MediaStore.MediaColumns.MIME_TYPE};
-
-    private static final String[] ALL_PROJECTION = {
-            MediaStore.Files.FileColumns._ID,
-            MediaStore.MediaColumns.DATA,
-            COLUMN_BUCKET_ID,
-            COLUMN_BUCKET_DISPLAY_NAME,
-            MediaStore.MediaColumns.MIME_TYPE,
-            "COUNT(*) AS " + COLUMN_COUNT};
-
-
-    /**
-     * Get the latest cover of an album catalog
-     *
-     * @param bucketId
-     * @return
-     */
     @Override
-    public String getFirstCover(long bucketId) {
+    public String getAlbumFirstCover(long bucketId) {
         Cursor data = null;
         try {
             if (SdkVersionUtils.isR()) {
-                Bundle queryArgs = MediaUtils.createQueryArgsBundle(getPageSelection(bucketId), getPageSelectionArgs(bucketId), 1, 0);
-                data = mContext.getContentResolver().query(QUERY_URI, new String[]{
+                Bundle queryArgs = MediaUtils.createQueryArgsBundle(getPageSelection(bucketId), getPageSelectionArgs(bucketId), 1, 0, getSortOrder());
+                data = getContext().getContentResolver().query(QUERY_URI, new String[]{
                         MediaStore.Files.FileColumns._ID,
                         MediaStore.MediaColumns.MIME_TYPE,
                         MediaStore.MediaColumns.DATA}, queryArgs, null);
             } else {
                 String orderBy = getSortOrder() + " limit 1 offset 0";
-                data = mContext.getContentResolver().query(QUERY_URI, new String[]{
+                data = getContext().getContentResolver().query(QUERY_URI, new String[]{
                         MediaStore.Files.FileColumns._ID,
                         MediaStore.MediaColumns.MIME_TYPE,
                         MediaStore.MediaColumns.DATA}, getPageSelection(bucketId), getPageSelectionArgs(bucketId), orderBy);
@@ -169,45 +160,9 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
         return null;
     }
 
-    /**
-     * Queries First for data in the specified directory
-     *
-     * @param bucketId
-     * @param pageSize
-     * @param listener
-     * @return
-     */
-    @Override
-    public void loadFirstPageMedia(long bucketId, int pageSize, OnQueryDataResultListener<LocalMedia> listener) {
-        loadPageMediaData(bucketId, 1, pageSize, pageSize, listener);
-    }
 
-    /**
-     * Queries for data in the specified directory (page)
-     *
-     * @param bucketId
-     * @param page
-     * @param limit
-     * @param pageSize
-     * @return
-     */
     @Override
     public void loadPageMediaData(long bucketId, int page, int pageSize, OnQueryDataResultListener<LocalMedia> listener) {
-        loadPageMediaData(bucketId, page, pageSize, pageSize, listener);
-    }
-
-    /**
-     * Queries for data in the specified directory (page)
-     *
-     * @param bucketId
-     * @param page
-     * @param limit
-     * @param pageSize
-     * @return
-     */
-    @Override
-    public void loadPageMediaData(long bucketId, int page, int limit, int pageSize,
-                                  OnQueryDataResultListener<LocalMedia> listener) {
         PictureThreadUtils.executeByIo(new PictureThreadUtils.SimpleTask<MediaData>() {
 
             @Override
@@ -215,97 +170,27 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                 Cursor data = null;
                 try {
                     if (SdkVersionUtils.isR()) {
-                        Bundle queryArgs = MediaUtils.createQueryArgsBundle(getPageSelection(bucketId), getPageSelectionArgs(bucketId), limit, (page - 1) * pageSize);
-                        data = mContext.getContentResolver().query(QUERY_URI, PROJECTION, queryArgs, null);
+                        Bundle queryArgs = MediaUtils.createQueryArgsBundle(getPageSelection(bucketId), getPageSelectionArgs(bucketId), pageSize, (page - 1) * pageSize, getSortOrder());
+                        data = getContext().getContentResolver().query(QUERY_URI, PROJECTION, queryArgs, null);
                     } else {
-                        String orderBy = page == -1 ? getSortOrder() : getSortOrder() + " limit " + limit + " offset " + (page - 1) * pageSize;
-                        data = mContext.getContentResolver().query(QUERY_URI, PROJECTION, getPageSelection(bucketId), getPageSelectionArgs(bucketId), orderBy);
+                        String orderBy = page == PictureConfig.ALL ? getSortOrder() : getSortOrder() + " limit " + pageSize + " offset " + (page - 1) * pageSize;
+                        data = getContext().getContentResolver().query(QUERY_URI, PROJECTION, getPageSelection(bucketId), getPageSelectionArgs(bucketId), orderBy);
                     }
                     if (data != null) {
                         ArrayList<LocalMedia> result = new ArrayList<>();
                         if (data.getCount() > 0) {
-                            int idColumn = data.getColumnIndexOrThrow(PROJECTION[0]);
-                            int dataColumn = data.getColumnIndexOrThrow(PROJECTION[1]);
-                            int mimeTypeColumn = data.getColumnIndexOrThrow(PROJECTION[2]);
-                            int widthColumn = data.getColumnIndexOrThrow(PROJECTION[3]);
-                            int heightColumn = data.getColumnIndexOrThrow(PROJECTION[4]);
-                            int durationColumn = data.getColumnIndexOrThrow(PROJECTION[5]);
-                            int sizeColumn = data.getColumnIndexOrThrow(PROJECTION[6]);
-                            int folderNameColumn = data.getColumnIndexOrThrow(PROJECTION[7]);
-                            int fileNameColumn = data.getColumnIndexOrThrow(PROJECTION[8]);
-                            int bucketIdColumn = data.getColumnIndexOrThrow(PROJECTION[9]);
-                            int dateAddedColumn = data.getColumnIndexOrThrow(PROJECTION[10]);
                             data.moveToFirst();
                             do {
-                                long id = data.getLong(idColumn);
-                                String mimeType = data.getString(mimeTypeColumn);
-                                mimeType = TextUtils.isEmpty(mimeType) ? PictureMimeType.ofJPEG() : mimeType;
-                                String absolutePath = data.getString(dataColumn);
-                                String url = SdkVersionUtils.isQ() ? MediaUtils.getRealPathUri(id, mimeType) : absolutePath;
-                                if (config.isFilterInvalidFile) {
-                                    if (!PictureFileUtils.isFileExists(absolutePath)) {
-                                        continue;
-                                    }
-                                }
-                                // Here, it is solved that some models obtain mimeType and return the format of image / *,
-                                // which makes it impossible to distinguish the specific type, such as mi 8,9,10 and other models
-                                if (mimeType.endsWith("image/*")) {
-                                    mimeType = MediaUtils.getMimeTypeFromMediaUrl(absolutePath);
-                                    if (!config.isGif) {
-                                        if (PictureMimeType.isHasGif(mimeType)) {
-                                            continue;
-                                        }
-                                    }
-                                }
-
-                                if (mimeType.endsWith("image/*")) {
+                                LocalMedia media = parseLocalMedia(data, false);
+                                if (media == null) {
                                     continue;
                                 }
-
-                                if (!config.isWebp) {
-                                    if (mimeType.startsWith(PictureMimeType.ofWEBP())) {
-                                        continue;
-                                    }
-                                }
-                                if (!config.isBmp) {
-                                    if (mimeType.startsWith(PictureMimeType.ofBMP())) {
-                                        continue;
-                                    }
-                                }
-                                int width = data.getInt(widthColumn);
-                                int height = data.getInt(heightColumn);
-                                long duration = data.getLong(durationColumn);
-                                long size = data.getLong(sizeColumn);
-                                String folderName = data.getString(folderNameColumn);
-                                String fileName = data.getString(fileNameColumn);
-                                long bucket_id = data.getLong(bucketIdColumn);
-
-                                if (PictureMimeType.isHasVideo(mimeType) || PictureMimeType.isHasAudio(mimeType)) {
-                                    if (config.filterVideoMinSecond > 0 && duration < config.filterVideoMinSecond) {
-                                        // If you set the minimum number of seconds of video to display
-                                        continue;
-                                    }
-                                    if (config.filterVideoMaxSecond > 0 && duration > config.filterVideoMaxSecond) {
-                                        // If you set the maximum number of seconds of video to display
-                                        continue;
-                                    }
-                                    if (duration == 0) {
-                                        //If the length is 0, the corrupted video is processed and filtered out
-                                        continue;
-                                    }
-                                    if (size <= 0) {
-                                        // The video size is 0 to filter out
-                                        continue;
-                                    }
-                                }
-
-                                LocalMedia image = LocalMedia.parseLocalMedia(id, url, absolutePath, fileName, folderName, duration, config.chooseMode, mimeType, width, height, size, bucket_id, data.getLong(dateAddedColumn));
-                                result.add(image);
+                                result.add(media);
 
                             } while (data.moveToNext());
                         }
                         if (bucketId == PictureConfig.ALL && page == 1) {
-                            List<LocalMedia> list = SandboxFileLoader.loadInAppSandboxFile(mContext,config.sandboxDir);
+                            List<LocalMedia> list = SandboxFileLoader.loadInAppSandboxFile(getContext(), getConfig().sandboxDir);
                             if (list != null) {
                                 result.addAll(list);
                                 SortUtils.sortLocalMediaAddedTime(result);
@@ -341,7 +226,7 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
 
             @Override
             public LocalMediaFolder doInBackground() {
-                return SandboxFileLoader.loadInAppSandboxFolderFile(mContext, config.sandboxDir);
+                return SandboxFileLoader.loadInAppSandboxFolderFile(getContext(), getConfig().sandboxDir);
             }
 
             @Override
@@ -357,15 +242,14 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
     /**
      * Query the local gallery data
      *
-     * @param listener
+     * @param query
      */
     @Override
     public void loadAllAlbum(OnQueryAllAlbumListener<LocalMediaFolder> query) {
         PictureThreadUtils.executeByIo(new PictureThreadUtils.SimpleTask<List<LocalMediaFolder>>() {
             @Override
             public List<LocalMediaFolder> doInBackground() {
-                Cursor data = mContext.getContentResolver().query(QUERY_URI,
-                        SdkVersionUtils.isQ() ? PROJECTION_29 : ALL_PROJECTION,
+                Cursor data = getContext().getContentResolver().query(QUERY_URI, isWithAllQuery() ? PROJECTION : ALL_PROJECTION,
                         getSelection(), getSelectionArgs(), getSortOrder());
                 try {
                     if (data != null) {
@@ -373,9 +257,17 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                         int totalCount = 0;
                         List<LocalMediaFolder> mediaFolders = new ArrayList<>();
                         if (count > 0) {
-                            if (SdkVersionUtils.isQ()) {
+                            if (isWithAllQuery()) {
                                 Map<Long, Long> countMap = new HashMap<>();
+                                Set<Long> hashSet = new HashSet<>();
                                 while (data.moveToNext()) {
+                                    if (getConfig().isPageSyncAsCount) {
+                                        LocalMedia media = parseLocalMedia(data, true);
+                                        if (media == null) {
+                                            continue;
+                                        }
+                                        media.recycle();
+                                    }
                                     long bucketId = data.getLong(data.getColumnIndexOrThrow(COLUMN_BUCKET_ID));
                                     Long newCount = countMap.get(bucketId);
                                     if (newCount == null) {
@@ -384,42 +276,42 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                                         newCount++;
                                     }
                                     countMap.put(bucketId, newCount);
-                                }
 
-                                if (data.moveToFirst()) {
-                                    Set<Long> hashSet = new HashSet<>();
-                                    do {
-                                        long bucketId = data.getLong(data.getColumnIndexOrThrow(COLUMN_BUCKET_ID));
-                                        if (hashSet.contains(bucketId)) {
-                                            continue;
-                                        }
-                                        LocalMediaFolder mediaFolder = new LocalMediaFolder();
-                                        mediaFolder.setBucketId(bucketId);
-                                        String bucketDisplayName = data.getString(
-                                                data.getColumnIndexOrThrow(COLUMN_BUCKET_DISPLAY_NAME));
-                                        String mimeType = data.getString(data.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
-                                        long size = countMap.get(bucketId);
-                                        long id = data.getLong(data.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID));
-                                        mediaFolder.setFolderName(bucketDisplayName);
-                                        mediaFolder.setFolderTotalNum(ValueOf.toInt(size));
-                                        mediaFolder.setFirstImagePath(MediaUtils.getRealPathUri(id, mimeType));
-                                        mediaFolder.setFirstMimeType(mimeType);
-                                        mediaFolders.add(mediaFolder);
-                                        hashSet.add(bucketId);
-                                        totalCount += size;
-                                    } while (data.moveToNext());
+                                    if (hashSet.contains(bucketId)) {
+                                        continue;
+                                    }
+                                    LocalMediaFolder mediaFolder = new LocalMediaFolder();
+                                    mediaFolder.setBucketId(bucketId);
+                                    String bucketDisplayName = data.getString(
+                                            data.getColumnIndexOrThrow(COLUMN_BUCKET_DISPLAY_NAME));
+                                    String mimeType = data.getString(data.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
+                                    if (!countMap.containsKey(bucketId)) {
+                                        continue;
+                                    }
+                                    long size = countMap.get(bucketId);
+                                    long id = data.getLong(data.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID));
+                                    mediaFolder.setFolderName(bucketDisplayName);
+                                    mediaFolder.setFolderTotalNum(ValueOf.toInt(size));
+                                    mediaFolder.setFirstImagePath(MediaUtils.getRealPathUri(id, mimeType));
+                                    mediaFolder.setFirstMimeType(mimeType);
+                                    mediaFolders.add(mediaFolder);
+                                    hashSet.add(bucketId);
                                 }
-
+                                for (LocalMediaFolder mediaFolder : mediaFolders) {
+                                    int size = ValueOf.toInt(countMap.get(mediaFolder.getBucketId()));
+                                    mediaFolder.setFolderTotalNum(size);
+                                    totalCount += size;
+                                }
                             } else {
                                 data.moveToFirst();
                                 do {
-                                    LocalMediaFolder mediaFolder = new LocalMediaFolder();
-                                    long bucketId = data.getLong(data.getColumnIndexOrThrow(COLUMN_BUCKET_ID));
+                                    String url = data.getString(data.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA));
                                     String bucketDisplayName = data.getString(data.getColumnIndexOrThrow(COLUMN_BUCKET_DISPLAY_NAME));
                                     String mimeType = data.getString(data.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE));
+                                    long bucketId = data.getLong(data.getColumnIndexOrThrow(COLUMN_BUCKET_ID));
                                     int size = data.getInt(data.getColumnIndexOrThrow(COLUMN_COUNT));
+                                    LocalMediaFolder mediaFolder = new LocalMediaFolder();
                                     mediaFolder.setBucketId(bucketId);
-                                    String url = data.getString(data.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA));
                                     mediaFolder.setFirstImagePath(url);
                                     mediaFolder.setFolderName(bucketDisplayName);
                                     mediaFolder.setFirstMimeType(mimeType);
@@ -428,12 +320,10 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                                     totalCount += size;
                                 } while (data.moveToNext());
                             }
-
                             // 相机胶卷
                             LocalMediaFolder allMediaFolder = new LocalMediaFolder();
-
                             LocalMediaFolder selfFolder = SandboxFileLoader
-                                    .loadInAppSandboxFolderFile(mContext, config.sandboxDir);
+                                    .loadInAppSandboxFolderFile(getContext(), getConfig().sandboxDir);
                             if (selfFolder != null) {
                                 mediaFolders.add(selfFolder);
                                 String firstImagePath = selfFolder.getFirstImagePath();
@@ -446,7 +336,7 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                                     allMediaFolder.setFirstMimeType(getFirstCoverMimeType(data));
                                     long lastModified2;
                                     if (PictureMimeType.isContent(allMediaFolder.getFirstImagePath())) {
-                                        String path = PictureFileUtils.getPath(mContext, Uri.parse(allMediaFolder.getFirstImagePath()));
+                                        String path = PictureFileUtils.getPath(getContext(), Uri.parse(allMediaFolder.getFirstImagePath()));
                                         lastModified2 = new File(path).lastModified();
                                     } else {
                                         lastModified2 = new File(allMediaFolder.getFirstImagePath()).lastModified();
@@ -462,17 +352,23 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                                     allMediaFolder.setFirstMimeType(getFirstCoverMimeType(data));
                                 }
                             }
-
+                            if (totalCount == 0) {
+                                return mediaFolders;
+                            }
                             SortUtils.sortFolder(mediaFolders);
                             allMediaFolder.setFolderTotalNum(totalCount);
                             allMediaFolder.setBucketId(PictureConfig.ALL);
-                            String bucketDisplayName = config.chooseMode == SelectMimeType.ofAudio() ?
-                                    mContext.getString(R.string.ps_all_audio)
-                                    : mContext.getString(R.string.ps_camera_roll);
-                            allMediaFolder.setFolderName(bucketDisplayName);
+                            String folderName;
+                            if (TextUtils.isEmpty(getConfig().defaultAlbumName)) {
+                                folderName = getConfig().chooseMode == SelectMimeType.ofAudio()
+                                        ? getContext().getString(R.string.ps_all_audio) : getContext().getString(R.string.ps_camera_roll);
+                            } else {
+                                folderName = getConfig().defaultAlbumName;
+                            }
+                            allMediaFolder.setFolderName(folderName);
                             mediaFolders.add(0, allMediaFolder);
-                            if (config.isSyncCover) {
-                                if (config.chooseMode == SelectMimeType.ofAll()) {
+                            if (getConfig().isSyncCover) {
+                                if (getConfig().chooseMode == SelectMimeType.ofAll()) {
                                     synchronousFirstCover(mediaFolders);
                                 }
                             }
@@ -493,6 +389,7 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
             @Override
             public void onSuccess(List<LocalMediaFolder> result) {
                 PictureThreadUtils.cancel(this);
+                LocalMedia.destroyPool();
                 if (query != null) {
                     query.onComplete(result);
                 }
@@ -511,7 +408,7 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
             if (mediaFolder == null) {
                 continue;
             }
-            String firstCover = getFirstCover(mediaFolder.getBucketId());
+            String firstCover = getAlbumFirstCover(mediaFolder.getBucketId());
             if (TextUtils.isEmpty(firstCover)) {
                 continue;
             }
@@ -555,7 +452,7 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
         String durationCondition = getDurationCondition();
         String sizeCondition = getFileSizeCondition();
         String queryMimeCondition = getQueryMimeCondition();
-        switch (config.chooseMode) {
+        switch (getConfig().chooseMode) {
             case SelectMimeType.TYPE_ALL:
                 //  Gets the all
                 return getPageSelectionArgsForAllMediaCondition(bucketId, queryMimeCondition, durationCondition, sizeCondition);
@@ -563,9 +460,11 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
                 // Gets the image of the specified type
                 return getPageSelectionArgsForImageMediaCondition(bucketId, queryMimeCondition, sizeCondition);
             case SelectMimeType.TYPE_VIDEO:
+                //  Gets the video or video
+                return getPageSelectionArgsForVideoMediaCondition(bucketId, queryMimeCondition, durationCondition, sizeCondition);
             case SelectMimeType.TYPE_AUDIO:
                 //  Gets the video or audio
-                return getPageSelectionArgsForVideoOrAudioMediaCondition(bucketId, queryMimeCondition, durationCondition, sizeCondition);
+                return getPageSelectionArgsForAudioMediaCondition(bucketId, queryMimeCondition, durationCondition, sizeCondition);
         }
         return null;
     }
@@ -574,7 +473,7 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE)
                 .append("=?").append(queryMimeCondition).append(" OR ").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=? AND ").append(durationCondition).append(") AND ");
-        if (bucketId == -1) {
+        if (bucketId == PictureConfig.ALL) {
             return stringBuilder.append(sizeCondition).toString();
         } else {
             return stringBuilder.append(COLUMN_BUCKET_ID).append("=? AND ").append(sizeCondition).toString();
@@ -584,17 +483,27 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
     private static String getPageSelectionArgsForImageMediaCondition(long bucketId, String queryMimeCondition, String sizeCondition) {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?");
-        if (bucketId == -1) {
+        if (bucketId == PictureConfig.ALL) {
             return stringBuilder.append(queryMimeCondition).append(") AND ").append(sizeCondition).toString();
         } else {
             return stringBuilder.append(queryMimeCondition).append(") AND ").append(COLUMN_BUCKET_ID).append("=? AND ").append(sizeCondition).toString();
         }
     }
 
-    private static String getPageSelectionArgsForVideoOrAudioMediaCondition(long bucketId, String queryMimeCondition, String durationCondition, String sizeCondition) {
+    private static String getPageSelectionArgsForVideoMediaCondition(long bucketId, String queryMimeCondition, String durationCondition, String sizeCondition) {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeCondition).append(" AND ").append(durationCondition).append(") AND ");
-        if (bucketId == -1) {
+        if (bucketId == PictureConfig.ALL) {
+            return stringBuilder.append(sizeCondition).toString();
+        } else {
+            return stringBuilder.append(COLUMN_BUCKET_ID).append("=? AND ").append(sizeCondition).toString();
+        }
+    }
+
+    private static String getPageSelectionArgsForAudioMediaCondition(long bucketId, String queryMimeCondition, String durationCondition, String sizeCondition) {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("(").append(MediaStore.Files.FileColumns.MEDIA_TYPE).append("=?").append(queryMimeCondition).append(" AND ").append(durationCondition).append(") AND ");
+        if (bucketId == PictureConfig.ALL) {
             return stringBuilder.append(sizeCondition).toString();
         } else {
             return stringBuilder.append(COLUMN_BUCKET_ID).append("=? AND ").append(sizeCondition).toString();
@@ -602,9 +511,9 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
     }
 
     private String[] getPageSelectionArgs(long bucketId) {
-        switch (config.chooseMode) {
+        switch (getConfig().chooseMode) {
             case SelectMimeType.TYPE_ALL:
-                if (bucketId == -1) {
+                if (bucketId == PictureConfig.ALL) {
                     // ofAll
                     return new String[]{
                             String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE),
@@ -630,40 +539,171 @@ public final class LocalMediaPageLoader extends IBridgeMediaLoader {
         return null;
     }
 
-
-    private String getSelection() {
+    @Override
+    protected String getSelection() {
+        String durationCondition = getDurationCondition();
         String fileSizeCondition = getFileSizeCondition();
         String queryMimeCondition = getQueryMimeCondition();
-        switch (config.chooseMode) {
+        switch (getConfig().chooseMode) {
             case SelectMimeType.TYPE_ALL:
                 // Get all, not including audio
-                return getSelectionArgsForAllMediaCondition(getDurationCondition(), fileSizeCondition, queryMimeCondition);
+                return getSelectionArgsForAllMediaCondition(durationCondition, fileSizeCondition, queryMimeCondition);
             case SelectMimeType.TYPE_IMAGE:
                 // Get Images
-                return getSelectionArgsForImageMediaCondition(queryMimeCondition, fileSizeCondition);
+                return getSelectionArgsForImageMediaCondition(fileSizeCondition, queryMimeCondition);
             case SelectMimeType.TYPE_VIDEO:
+                // Access to video
+                return getSelectionArgsForVideoMediaCondition(durationCondition, queryMimeCondition);
             case SelectMimeType.TYPE_AUDIO:
-                // Gets the specified album directory
-                return getSelectionArgsForVideoOrAudioMediaCondition(queryMimeCondition, fileSizeCondition);
+                // Access to the audio
+                return getSelectionArgsForAudioMediaCondition(durationCondition, queryMimeCondition);
         }
         return null;
     }
 
-    private String[] getSelectionArgs() {
-        switch (config.chooseMode) {
+    @Override
+    protected String[] getSelectionArgs() {
+        switch (getConfig().chooseMode) {
             case SelectMimeType.TYPE_ALL:
                 // Get all
-                return getSelectionArgsForAllMediaType();
+                return new String[]{
+                        String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE),
+                        String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO)};
             case SelectMimeType.TYPE_IMAGE:
                 // Get photo
-                return getSelectionArgsForSingleMediaType(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE);
+                return new String[]{String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE)};
             case SelectMimeType.TYPE_VIDEO:
                 // Get video
-                return getSelectionArgsForSingleMediaType(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO);
+                return new String[]{String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO)};
             case SelectMimeType.TYPE_AUDIO:
                 // Get audio
-                return getSelectionArgsForSingleMediaType(MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO);
+                return new String[]{String.valueOf(MediaStore.Files.FileColumns.MEDIA_TYPE_AUDIO)};
         }
         return null;
+    }
+
+    @Override
+    protected String getSortOrder() {
+        return TextUtils.isEmpty(getConfig().sortOrder) ? ORDER_BY : getConfig().sortOrder;
+    }
+
+    /**
+     * 查询方式
+     */
+    private boolean isWithAllQuery() {
+        if (SdkVersionUtils.isQ()) {
+            return true;
+        } else {
+            return getConfig().isPageSyncAsCount;
+        }
+    }
+
+    @Override
+    protected LocalMedia parseLocalMedia(Cursor data, boolean isUsePool) {
+        int idColumn = data.getColumnIndexOrThrow(PROJECTION[0]);
+        int dataColumn = data.getColumnIndexOrThrow(PROJECTION[1]);
+        int mimeTypeColumn = data.getColumnIndexOrThrow(PROJECTION[2]);
+        int widthColumn = data.getColumnIndexOrThrow(PROJECTION[3]);
+        int heightColumn = data.getColumnIndexOrThrow(PROJECTION[4]);
+        int durationColumn = data.getColumnIndexOrThrow(PROJECTION[5]);
+        int sizeColumn = data.getColumnIndexOrThrow(PROJECTION[6]);
+        int folderNameColumn = data.getColumnIndexOrThrow(PROJECTION[7]);
+        int fileNameColumn = data.getColumnIndexOrThrow(PROJECTION[8]);
+        int bucketIdColumn = data.getColumnIndexOrThrow(PROJECTION[9]);
+        int dateAddedColumn = data.getColumnIndexOrThrow(PROJECTION[10]);
+        int orientationColumn = data.getColumnIndexOrThrow(PROJECTION[11]);
+        long id = data.getLong(idColumn);
+        String mimeType = data.getString(mimeTypeColumn);
+        String absolutePath = data.getString(dataColumn);
+        String url = SdkVersionUtils.isQ() ? MediaUtils.getRealPathUri(id, mimeType) : absolutePath;
+        mimeType = TextUtils.isEmpty(mimeType) ? PictureMimeType.ofJPEG() : mimeType;
+        if (getConfig().isFilterInvalidFile) {
+            if (PictureMimeType.isHasImage(mimeType)) {
+                if (!TextUtils.isEmpty(absolutePath) && !PictureFileUtils.isImageFileExists(absolutePath)) {
+                    return null;
+                }
+            } else {
+                if (!PictureFileUtils.isFileExists(absolutePath)) {
+                    return null;
+                }
+            }
+        }
+        // Here, it is solved that some models obtain mimeType and return the format of image / *,
+        // which makes it impossible to distinguish the specific type, such as mi 8,9,10 and other models
+        if (mimeType.endsWith("image/*")) {
+            mimeType = MediaUtils.getMimeTypeFromMediaUrl(absolutePath);
+            if (!getConfig().isGif) {
+                if (PictureMimeType.isHasGif(mimeType)) {
+                    return null;
+                }
+            }
+        }
+        if (mimeType.endsWith("image/*")) {
+            return null;
+        }
+        if (!getConfig().isWebp) {
+            if (mimeType.startsWith(PictureMimeType.ofWEBP())) {
+                return null;
+            }
+        }
+        if (!getConfig().isBmp) {
+            if (PictureMimeType.isHasBmp(mimeType)) {
+                return null;
+            }
+        }
+        int width = data.getInt(widthColumn);
+        int height = data.getInt(heightColumn);
+        int orientation = data.getInt(orientationColumn);
+        if (orientation == 90 || orientation == 270) {
+            width = data.getInt(heightColumn);
+            height = data.getInt(widthColumn);
+        }
+        long duration = data.getLong(durationColumn);
+        long size = data.getLong(sizeColumn);
+        String folderName = data.getString(folderNameColumn);
+        String fileName = data.getString(fileNameColumn);
+        long bucketId = data.getLong(bucketIdColumn);
+        long dateAdded = data.getLong(dateAddedColumn);
+        if (TextUtils.isEmpty(fileName)) {
+            fileName = PictureMimeType.getUrlToFileName(absolutePath);
+        }
+        if (getConfig().isFilterSizeDuration && size > 0 && size < FileSizeUnit.KB) {
+            // Filter out files less than 1KB
+            return null;
+        }
+        if (PictureMimeType.isHasVideo(mimeType) || PictureMimeType.isHasAudio(mimeType)) {
+            if (getConfig().filterVideoMinSecond > 0 && duration < getConfig().filterVideoMinSecond) {
+                // If you set the minimum number of seconds of video to display
+                return null;
+            }
+            if (getConfig().filterVideoMaxSecond > 0 && duration > getConfig().filterVideoMaxSecond) {
+                // If you set the maximum number of seconds of video to display
+                return null;
+            }
+            if (getConfig().isFilterSizeDuration && duration <= 0) {
+                //If the length is 0, the corrupted video is processed and filtered out
+                return null;
+            }
+        }
+        LocalMedia media = isUsePool ? LocalMedia.obtain() : LocalMedia.create();
+        media.setId(id);
+        media.setBucketId(bucketId);
+        media.setPath(url);
+        media.setRealPath(absolutePath);
+        media.setFileName(fileName);
+        media.setParentFolderName(folderName);
+        media.setDuration(duration);
+        media.setChooseModel(getConfig().chooseMode);
+        media.setMimeType(mimeType);
+        media.setWidth(width);
+        media.setHeight(height);
+        media.setSize(size);
+        media.setDateAddedTime(dateAdded);
+        if (PictureSelectionConfig.onQueryFilterListener != null) {
+            if (PictureSelectionConfig.onQueryFilterListener.onFilter(media)) {
+                return null;
+            }
+        }
+        return media;
     }
 }

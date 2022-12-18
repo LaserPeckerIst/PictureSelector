@@ -2,6 +2,7 @@ package com.luck.picture.lib.adapter;
 
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -46,24 +47,30 @@ public class PicturePreviewAdapter extends RecyclerView.Adapter<BasePreviewHolde
         int layoutResourceId;
         if (viewType == BasePreviewHolder.ADAPTER_TYPE_VIDEO) {
             layoutResourceId = InjectResourceSource.getLayoutResource(parent.getContext(), InjectResourceSource.PREVIEW_ITEM_VIDEO_LAYOUT_RESOURCE);
-            return BasePreviewHolder.generate(parent, viewType, layoutResourceId != 0 ? layoutResourceId : R.layout.ps_preview_video);
+            return BasePreviewHolder.generate(parent, viewType, layoutResourceId != InjectResourceSource.DEFAULT_LAYOUT_RESOURCE ? layoutResourceId : R.layout.ps_preview_video);
         } else if (viewType == BasePreviewHolder.ADAPTER_TYPE_AUDIO) {
             layoutResourceId = InjectResourceSource.getLayoutResource(parent.getContext(), InjectResourceSource.PREVIEW_ITEM_AUDIO_LAYOUT_RESOURCE);
-            return BasePreviewHolder.generate(parent, viewType, layoutResourceId != 0 ? layoutResourceId : R.layout.ps_preview_audio);
+            return BasePreviewHolder.generate(parent, viewType, layoutResourceId != InjectResourceSource.DEFAULT_LAYOUT_RESOURCE ? layoutResourceId : R.layout.ps_preview_audio);
         } else {
             layoutResourceId = InjectResourceSource.getLayoutResource(parent.getContext(), InjectResourceSource.PREVIEW_ITEM_IMAGE_LAYOUT_RESOURCE);
-            return BasePreviewHolder.generate(parent, viewType, layoutResourceId != 0 ? layoutResourceId : R.layout.ps_preview_image);
+            return BasePreviewHolder.generate(parent, viewType, layoutResourceId != InjectResourceSource.DEFAULT_LAYOUT_RESOURCE ? layoutResourceId : R.layout.ps_preview_image);
         }
     }
 
     @Override
     public void onBindViewHolder(@NonNull BasePreviewHolder holder, int position) {
         holder.setOnPreviewEventListener(onPreviewEventListener);
-        LocalMedia media = mData.get(position);
+        LocalMedia media = getItem(position);
         mHolderCache.put(position, holder);
         holder.bindData(media, position);
     }
 
+    public LocalMedia getItem(int position) {
+        if (position > mData.size()) {
+            return null;
+        }
+        return mData.get(position);
+    }
 
     @Override
     public int getItemViewType(int position) {
@@ -94,6 +101,23 @@ public class PicturePreviewAdapter extends RecyclerView.Adapter<BasePreviewHolde
     }
 
     /**
+     * 设置封面的缩放方式
+     *
+     * @param position
+     */
+    public void setCoverScaleType(int position) {
+        BasePreviewHolder currentHolder = getCurrentHolder(position);
+        if (currentHolder != null) {
+            LocalMedia media = getItem(position);
+            if (media.getWidth() == 0 && media.getHeight() == 0) {
+                currentHolder.coverImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            } else {
+                currentHolder.coverImageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
+            }
+        }
+    }
+
+    /**
      * 设置播放按钮状态
      *
      * @param position
@@ -102,10 +126,37 @@ public class PicturePreviewAdapter extends RecyclerView.Adapter<BasePreviewHolde
         BasePreviewHolder currentHolder = getCurrentHolder(position);
         if (currentHolder instanceof PreviewVideoHolder) {
             PreviewVideoHolder videoHolder = (PreviewVideoHolder) currentHolder;
-            if (videoHolder.ivPlayButton.getVisibility() == View.GONE) {
+            if (!videoHolder.isPlaying()) {
                 videoHolder.ivPlayButton.setVisibility(View.VISIBLE);
             }
         }
+    }
+
+    /**
+     * 设置自动播放视频
+     *
+     * @param position
+     */
+    public void startAutoVideoPlay(int position) {
+        BasePreviewHolder currentHolder = getCurrentHolder(position);
+        if (currentHolder instanceof PreviewVideoHolder) {
+            PreviewVideoHolder videoHolder = (PreviewVideoHolder) currentHolder;
+            videoHolder.startPlay();
+        }
+    }
+
+    /**
+     * isPlaying
+     *
+     * @param position
+     * @return
+     */
+    public boolean isPlaying(int position) {
+        BasePreviewHolder currentHolder = getCurrentHolder(position);
+        if (currentHolder instanceof PreviewVideoHolder) {
+            return ((PreviewVideoHolder) currentHolder).isPlaying();
+        }
+        return false;
     }
 
     /**

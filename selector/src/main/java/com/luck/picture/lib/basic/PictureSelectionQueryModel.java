@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.provider.MediaStore;
 import android.text.TextUtils;
 
+import com.luck.picture.lib.config.FileSizeUnit;
 import com.luck.picture.lib.config.PictureConfig;
 import com.luck.picture.lib.config.PictureSelectionConfig;
 import com.luck.picture.lib.entity.LocalMedia;
@@ -11,6 +12,7 @@ import com.luck.picture.lib.entity.LocalMediaFolder;
 import com.luck.picture.lib.interfaces.OnQueryAllAlbumListener;
 import com.luck.picture.lib.interfaces.OnQueryDataResultListener;
 import com.luck.picture.lib.interfaces.OnQueryDataSourceListener;
+import com.luck.picture.lib.interfaces.OnQueryFilterListener;
 import com.luck.picture.lib.loader.IBridgeMediaLoader;
 import com.luck.picture.lib.loader.LocalMediaLoader;
 import com.luck.picture.lib.loader.LocalMediaPageLoader;
@@ -73,6 +75,17 @@ public class PictureSelectionQueryModel {
     }
 
     /**
+     * You need to filter out what doesn't meet the standards
+     *
+     * @param listener
+     * @return
+     */
+    public PictureSelectionQueryModel setQueryFilterListener(OnQueryFilterListener listener) {
+        PictureSelectionConfig.onQueryFilterListener = listener;
+        return this;
+    }
+
+    /**
      * query local data source sort
      * {@link MediaStore.MediaColumns.DATE_MODIFIED # DATE_ADDED # _ID}
      * <p>
@@ -125,10 +138,10 @@ public class PictureSelectionQueryModel {
      * @return
      */
     public PictureSelectionQueryModel setFilterMaxFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.filterMaxFileSize = fileKbSize;
         } else {
-            selectionConfig.filterMaxFileSize = fileKbSize * 1024;
+            selectionConfig.filterMaxFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -140,10 +153,10 @@ public class PictureSelectionQueryModel {
      * @return
      */
     public PictureSelectionQueryModel setFilterMinFileSize(long fileKbSize) {
-        if (fileKbSize >= PictureConfig.MB) {
+        if (fileKbSize >= FileSizeUnit.MB) {
             selectionConfig.filterMinFileSize = fileKbSize;
         } else {
-            selectionConfig.filterMinFileSize = fileKbSize * 1024;
+            selectionConfig.filterMinFileSize = fileKbSize * FileSizeUnit.KB;
         }
         return this;
     }
@@ -179,12 +192,8 @@ public class PictureSelectionQueryModel {
         if (activity == null) {
             throw new NullPointerException("Activity cannot be null");
         }
-        IBridgeMediaLoader loader;
-        if (selectionConfig.isPageStrategy) {
-            loader = new LocalMediaPageLoader(activity, selectionConfig);
-        } else {
-            loader = new LocalMediaLoader(activity, selectionConfig);
-        }
+        IBridgeMediaLoader loader = selectionConfig.isPageStrategy ? new LocalMediaPageLoader() : new LocalMediaLoader();
+        loader.initConfig(activity, selectionConfig);
         return loader;
     }
 
@@ -202,12 +211,8 @@ public class PictureSelectionQueryModel {
         if (call == null) {
             throw new NullPointerException("OnQueryDataSourceListener cannot be null");
         }
-        IBridgeMediaLoader loader;
-        if (selectionConfig.isPageStrategy) {
-            loader = new LocalMediaPageLoader(activity, selectionConfig);
-        } else {
-            loader = new LocalMediaLoader(activity, selectionConfig);
-        }
+        IBridgeMediaLoader loader = selectionConfig.isPageStrategy?new LocalMediaPageLoader():new LocalMediaLoader();
+        loader.initConfig(activity, selectionConfig);
         loader.loadAllAlbum(new OnQueryAllAlbumListener<LocalMediaFolder>() {
             @Override
             public void onComplete(List<LocalMediaFolder> result) {
@@ -230,19 +235,15 @@ public class PictureSelectionQueryModel {
         if (call == null) {
             throw new NullPointerException("OnQueryDataSourceListener cannot be null");
         }
-        IBridgeMediaLoader loader;
-        if (selectionConfig.isPageStrategy) {
-            loader = new LocalMediaPageLoader(activity, selectionConfig);
-        } else {
-            loader = new LocalMediaLoader(activity, selectionConfig);
-        }
+        IBridgeMediaLoader loader = selectionConfig.isPageStrategy ? new LocalMediaPageLoader() : new LocalMediaLoader();
+        loader.initConfig(activity, selectionConfig);
         loader.loadAllAlbum(new OnQueryAllAlbumListener<LocalMediaFolder>() {
             @Override
             public void onComplete(List<LocalMediaFolder> result) {
                 if (result != null && result.size() > 0) {
                     LocalMediaFolder all = result.get(0);
                     if (selectionConfig.isPageStrategy) {
-                        loader.loadFirstPageMedia(all.getBucketId(), selectionConfig.pageSize,
+                        loader.loadPageMediaData(all.getBucketId(), 1, selectionConfig.pageSize,
                                 new OnQueryDataResultListener<LocalMedia>() {
                                     @Override
                                     public void onComplete(ArrayList<LocalMedia> result, boolean isHasMore) {

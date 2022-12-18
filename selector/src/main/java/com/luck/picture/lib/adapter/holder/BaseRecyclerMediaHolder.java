@@ -21,6 +21,7 @@ import com.luck.picture.lib.config.SelectModeConfig;
 import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.manager.SelectedManager;
 import com.luck.picture.lib.style.SelectMainStyle;
+import com.luck.picture.lib.utils.AnimUtils;
 import com.luck.picture.lib.utils.StyleUtils;
 import com.luck.picture.lib.utils.ValueOf;
 
@@ -160,6 +161,21 @@ public class BaseRecyclerMediaHolder extends RecyclerView.ViewHolder {
                 int resultCode = listener.onSelected(tvCheck, position, media);
                 if (resultCode == SelectedManager.INVALID) {
                     return;
+                }
+                if (resultCode == SelectedManager.ADD_SUCCESS) {
+                    if (config.isSelectZoomAnim) {
+                        if (PictureSelectionConfig.onItemSelectAnimListener != null) {
+                            PictureSelectionConfig.onItemSelectAnimListener.onSelectItemAnim(ivPicture, true);
+                        } else {
+                            AnimUtils.selectZoom(ivPicture);
+                        }
+                    }
+                } else if (resultCode == SelectedManager.REMOVE) {
+                    if (config.isSelectZoomAnim) {
+                        if (PictureSelectionConfig.onItemSelectAnimListener != null) {
+                            PictureSelectionConfig.onItemSelectAnimListener.onSelectItemAnim(ivPicture, false);
+                        }
+                    }
                 }
                 selectedMedia(isSelected(media));
             }

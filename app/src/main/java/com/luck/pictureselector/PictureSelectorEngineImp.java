@@ -3,15 +3,21 @@ package com.luck.pictureselector;
 import android.content.Context;
 import android.util.Log;
 
+import com.luck.picture.lib.basic.IBridgeLoaderFactory;
 import com.luck.picture.lib.config.InjectResourceSource;
 import com.luck.picture.lib.engine.CompressEngine;
+import com.luck.picture.lib.engine.CompressFileEngine;
 import com.luck.picture.lib.engine.ExtendLoaderEngine;
 import com.luck.picture.lib.engine.ImageEngine;
+import com.luck.picture.lib.engine.MediaPlayerEngine;
 import com.luck.picture.lib.engine.PictureSelectorEngine;
 import com.luck.picture.lib.engine.SandboxFileEngine;
+import com.luck.picture.lib.engine.UriToFileTransformEngine;
+import com.luck.picture.lib.engine.VideoPlayerEngine;
 import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.interfaces.OnInjectLayoutResourceListener;
 import com.luck.picture.lib.interfaces.OnResultCallbackListener;
+import com.luck.picture.lib.loader.IBridgeMediaLoader;
 
 import java.util.ArrayList;
 
@@ -46,6 +52,17 @@ public class PictureSelectorEngineImp implements PictureSelectorEngine {
     }
 
     /**
+     * 重新创建{@link CompressEngine}引擎
+     *
+     * @return
+     */
+    @Override
+    public CompressFileEngine createCompressFileEngine() {
+        // TODO 这种情况是内存极度不足的情况下，比如开启开发者选项中的不保留活动或后台进程限制，导致CompressFileEngine被回收
+        return null;
+    }
+
+    /**
      * 重新创建{@link ExtendLoaderEngine}引擎
      *
      * @return
@@ -53,6 +70,22 @@ public class PictureSelectorEngineImp implements PictureSelectorEngine {
     @Override
     public ExtendLoaderEngine createLoaderDataEngine() {
         // TODO 这种情况是内存极度不足的情况下，比如开启开发者选项中的不保留活动或后台进程限制，导致ExtendLoaderEngine被回收
+        return null;
+    }
+
+    @Override
+    public VideoPlayerEngine createVideoPlayerEngine() {
+        // TODO 这种情况是内存极度不足的情况下，比如开启开发者选项中的不保留活动或后台进程限制，导致VideoPlayerEngine被回收
+        return null;
+    }
+
+    /**
+     *  重新创建{@link IBridgeMediaLoader}引擎
+     * @return
+     */
+    @Override
+    public IBridgeLoaderFactory onCreateLoader() {
+        // TODO 这种情况是内存极度不足的情况下，比如开启开发者选项中的不保留活动或后台进程限制，导致IBridgeLoaderFactory被回收
         return null;
     }
 
@@ -64,6 +97,17 @@ public class PictureSelectorEngineImp implements PictureSelectorEngine {
     @Override
     public SandboxFileEngine createSandboxFileEngine() {
         // TODO 这种情况是内存极度不足的情况下，比如开启开发者选项中的不保留活动或后台进程限制，导致SandboxFileEngine被回收
+        return null;
+    }
+
+    /**
+     * 重新创建{@link UriToFileTransformEngine}引擎
+     *
+     * @return
+     */
+    @Override
+    public UriToFileTransformEngine createUriToFileTransformEngine() {
+        // TODO 这种情况是内存极度不足的情况下，比如开启开发者选项中的不保留活动或后台进程限制，导致UriToFileTransformEngine被回收
         return null;
     }
 

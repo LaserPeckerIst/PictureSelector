@@ -12,6 +12,7 @@ import java.util.ArrayList;
 /**
  * @author：luck
  * @date：2021/11/23 8:13 下午
+ * Please Use {@link CropFileEngine}
  * @describe：CropEngine
  */
 public interface CropEngine {

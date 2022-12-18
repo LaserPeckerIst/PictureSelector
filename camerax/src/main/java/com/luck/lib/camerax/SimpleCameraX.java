@@ -10,6 +10,8 @@ import android.provider.MediaStore;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 
+import com.luck.lib.camerax.listener.OnSimpleXPermissionDeniedListener;
+import com.luck.lib.camerax.listener.OnSimpleXPermissionDescriptionListener;
 import com.luck.lib.camerax.utils.FileUtils;
 
 /**
@@ -53,6 +55,9 @@ public class SimpleCameraX {
 
     public static final String EXTRA_ZOOM_PREVIEW = EXTRA_PREFIX + ".isZoomPreview";
 
+    public static final String EXTRA_AUTO_ROTATION = EXTRA_PREFIX + ".isAutoRotation";
+
+
     private final Intent mCameraIntent;
 
     private final Bundle mCameraBundle;
@@ -73,6 +78,9 @@ public class SimpleCameraX {
      * @param requestCode requestCode for result
      */
     public void start(@NonNull Activity activity, int requestCode) {
+        if (CustomCameraConfig.imageEngine == null) {
+            throw new NullPointerException("Missing ImageEngine,please implement SimpleCamerax.setImageEngine");
+        }
         activity.startActivityForResult(getIntent(activity), requestCode);
     }
 
@@ -84,6 +92,9 @@ public class SimpleCameraX {
      * @param requestCode requestCode for result
      */
     public void start(@NonNull Context context, @NonNull Fragment fragment, int requestCode) {
+        if (CustomCameraConfig.imageEngine == null) {
+            throw new NullPointerException("Missing ImageEngine,please implement SimpleCamerax.setImageEngine");
+        }
         fragment.startActivityForResult(getIntent(context), requestCode);
     }
 
@@ -105,10 +116,29 @@ public class SimpleCameraX {
      * @return
      */
     public SimpleCameraX setImageEngine(CameraImageEngine engine) {
-        if (CustomCameraConfig.imageEngine == engine) {
-            throw new NullPointerException("Missing ImageEngine,please implement SimpleCamerax.setImageEngine");
-        }
         CustomCameraConfig.imageEngine = engine;
+        return this;
+    }
+
+    /**
+     * Permission description
+     *
+     * @param explainListener
+     * @return
+     */
+    public SimpleCameraX setPermissionDescriptionListener(OnSimpleXPermissionDescriptionListener explainListener) {
+        CustomCameraConfig.explainListener = explainListener;
+        return this;
+    }
+
+    /**
+     * Permission denied
+     *
+     * @param deniedListener
+     * @return
+     */
+    public SimpleCameraX setPermissionDeniedListener(OnSimpleXPermissionDeniedListener deniedListener) {
+        CustomCameraConfig.deniedListener = deniedListener;
         return this;
     }
 
@@ -188,7 +218,7 @@ public class SimpleCameraX {
      * @return
      */
     public SimpleCameraX setRecordVideoMaxSecond(int maxSecond) {
-        mCameraBundle.putInt(EXTRA_RECORD_VIDEO_MAX_SECOND, maxSecond * 1000);
+        mCameraBundle.putInt(EXTRA_RECORD_VIDEO_MAX_SECOND, maxSecond * 1000 + 500);
         return this;
     }
 
@@ -300,6 +330,17 @@ public class SimpleCameraX {
      */
     public SimpleCameraX isZoomCameraPreview(boolean isZoom) {
         mCameraBundle.putBoolean(EXTRA_ZOOM_PREVIEW, isZoom);
+        return this;
+    }
+
+    /**
+     * 是否自动纠偏
+     *
+     * @param isAutoRotation
+     * @return
+     */
+    public SimpleCameraX isAutoRotation(boolean isAutoRotation) {
+        mCameraBundle.putBoolean(EXTRA_AUTO_ROTATION, isAutoRotation);
         return this;
     }
 

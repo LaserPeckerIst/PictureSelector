@@ -1,11 +1,8 @@
 package com.luck.picture.lib.utils;
 
-import static java.lang.Math.abs;
-
 import android.annotation.SuppressLint;
 import android.content.Context;
 
-import com.google.android.exoplayer2.C;
 import com.luck.picture.lib.R;
 
 import java.text.SimpleDateFormat;
@@ -73,9 +70,7 @@ public class DateUtils {
      * @return
      */
     public static long millisecondToSecond(long duration) {
-        duration = abs(duration);
-        long totalSeconds = (duration + 500) / 1000;
-        return totalSeconds * 1000;
+        return (duration / 1000) * 1000;
     }
 
     /**
@@ -102,12 +97,9 @@ public class DateUtils {
      * @return
      */
     public static String formatDurationTime(long timeMs) {
-        if (timeMs == C.TIME_UNSET) {
-            timeMs = 0;
-        }
         String prefix = timeMs < 0 ? "-" : "";
-        timeMs = abs(timeMs);
-        long totalSeconds = (timeMs + 500) / 1000;
+        timeMs = Math.abs(timeMs);
+        long totalSeconds = timeMs / 1000;
         long seconds = totalSeconds % 60;
         long minutes = (totalSeconds / 60) % 60;
         long hours = totalSeconds / 3600;

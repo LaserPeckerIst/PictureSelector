@@ -1,6 +1,8 @@
 package com.luck.lib.camerax.utils;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -11,8 +13,10 @@ import androidx.core.content.FileProvider;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Objects;
@@ -114,6 +118,23 @@ public class FileUtils {
         return context.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
     }
 
+
+    /**
+     * 创建一个临时路径，主要是解决华为手机放弃拍照后会弹出相册图片被删除的提示
+     *
+     * @param isVideo
+     * @return
+     */
+    public static File createTempFile(Context context, boolean isVideo) {
+        File externalFilesDir = context.getExternalFilesDir("");
+        File tempCameraFile = new File(externalFilesDir.getAbsolutePath(), ".TemporaryCamera");
+        if (!tempCameraFile.exists()) {
+            tempCameraFile.mkdirs();
+        }
+        String fileName = System.currentTimeMillis() + (isVideo ? CameraUtils.MP4 : CameraUtils.JPEG);
+        return new File(tempCameraFile.getAbsolutePath(), fileName);
+    }
+
     /**
      * 生成uri
      *
@@ -144,6 +165,43 @@ public class FileUtils {
             return false;
         }
         return url.startsWith("content://");
+    }
+
+
+    /**
+     * 文件复制
+     *
+     * @param context
+     * @param originalPath
+     * @param newPath
+     * @return
+     */
+    public static boolean copyPath(Context context, String originalPath, String newPath) {
+        FileOutputStream fos = null;
+        ByteArrayOutputStream stream = null;
+        try {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(originalPath, options);
+            options.inSampleSize = BitmapUtils.computeSize(options.outWidth, options.outHeight);
+            options.inJustDecodeBounds = false;
+
+            Bitmap newBitmap = BitmapUtils.toHorizontalMirror(BitmapFactory.decodeFile(originalPath, options));
+            stream = new ByteArrayOutputStream();
+            newBitmap.compress(newBitmap.hasAlpha() ? Bitmap.CompressFormat.PNG : Bitmap.CompressFormat.JPEG, 90, stream);
+            newBitmap.recycle();
+            fos = new FileOutputStream(newPath);
+            fos.write(stream.toByteArray());
+            fos.flush();
+            FileUtils.deleteFile(context, originalPath);
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            FileUtils.close(fos);
+            FileUtils.close(stream);
+        }
+        return false;
     }
 
     /**

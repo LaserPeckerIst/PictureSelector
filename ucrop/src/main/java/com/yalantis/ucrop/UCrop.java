@@ -120,7 +120,7 @@ public class UCrop {
         ArrayList<String> dataSource = mCropOptionsBundle.getStringArrayList(EXTRA_CROP_TOTAL_DATA_SOURCE);
         boolean isUseBitmap = mCropOptionsBundle.getBoolean(UCrop.Options.EXTRA_CROP_CUSTOM_LOADER_BITMAP, false);
         if ((dataSource != null && dataSource.size() > 1) || isUseBitmap) {
-            if (UCropDevelopConfig.imageEngine == engine) {
+            if (engine == null) {
                 throw new NullPointerException("Missing ImageEngine,please implement UCrop.setImageEngine");
             }
         }
@@ -260,7 +260,7 @@ public class UCrop {
      */
     @Nullable
     public static Uri getOutput(@NonNull Intent intent) {
-        return intent.getParcelableExtra(MediaStore.EXTRA_OUTPUT);
+        return intent.getParcelableExtra(UCrop.EXTRA_OUTPUT_URI);
     }
 
     /**

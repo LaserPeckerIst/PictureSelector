@@ -4,13 +4,14 @@ import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.entity.LocalMediaFolder;
 
 import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @author：luck
  * @date：2021/11/20 8:57 下午
  * @describe：SelectedManager
  */
-public class SelectedManager {
+public final class SelectedManager {
     public static final int INVALID = -1;
     public static final int ADD_SUCCESS = 0;
     public static final int REMOVE = 1;
@@ -48,7 +49,7 @@ public class SelectedManager {
     }
 
     /**
-     * selected external preview result
+     * selected preview result
      */
     private static final ArrayList<LocalMedia> selectedPreviewResult = new ArrayList<>();
 
@@ -57,13 +58,58 @@ public class SelectedManager {
     }
 
     public static void addSelectedPreviewResult(ArrayList<LocalMedia> list) {
-        clearExternalPreviewData();
+        clearPreviewData();
         selectedPreviewResult.addAll(list);
     }
 
-    public static void clearExternalPreviewData() {
+    public static void clearPreviewData() {
         if (selectedPreviewResult.size() > 0) {
             selectedPreviewResult.clear();
+        }
+    }
+
+
+    /**
+     * all data source
+     */
+    private static final ArrayList<LocalMedia> dataSource = new ArrayList<>();
+
+    public static ArrayList<LocalMedia> getDataSource() {
+        return dataSource;
+    }
+
+    public static void addDataSource(ArrayList<LocalMedia> list) {
+        if (list != null) {
+            clearDataSource();
+            dataSource.addAll(list);
+        }
+    }
+
+    public static void clearDataSource() {
+        if (dataSource.size() > 0) {
+            dataSource.clear();
+        }
+    }
+
+    /**
+     * all album data source
+     */
+    private static final ArrayList<LocalMediaFolder> albumDataSource = new ArrayList<>();
+
+    public static ArrayList<LocalMediaFolder> getAlbumDataSource() {
+        return albumDataSource;
+    }
+
+    public static void addAlbumDataSource(List<LocalMediaFolder> list) {
+        if (list != null) {
+            clearAlbumDataSource();
+            albumDataSource.addAll(list);
+        }
+    }
+
+    public static void clearAlbumDataSource() {
+        if (albumDataSource.size() > 0) {
+            albumDataSource.clear();
         }
     }
 

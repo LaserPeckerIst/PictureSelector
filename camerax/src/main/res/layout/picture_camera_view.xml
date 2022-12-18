@@ -19,12 +19,19 @@
         app:focus_focusing="@drawable/focus_focusing"
         app:focus_success="@drawable/focus_focused" />
 
+    <View
+        android:id="@+id/cover_preview_bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_centerInParent="true"
+        android:alpha="0"
+        android:background="@color/picture_color_black" />
+
     <ImageView
         android:id="@+id/cover_preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_centerInParent="true"
-        android:scaleType="centerCrop"
         android:visibility="invisible" />
 
     <TextureView
