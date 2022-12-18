@@ -19,6 +19,7 @@ import com.luck.picture.lib.entity.LocalMedia;
 import com.luck.picture.lib.entity.MediaExtraInfo;
 
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 
 
@@ -144,7 +145,11 @@ public class MediaUtils {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            retriever.release();
+            try {
+                retriever.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         return mediaExtraInfo;
     }
@@ -169,7 +174,11 @@ public class MediaUtils {
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            retriever.release();
+            try {
+                retriever.release();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
         return mediaExtraInfo;
     }

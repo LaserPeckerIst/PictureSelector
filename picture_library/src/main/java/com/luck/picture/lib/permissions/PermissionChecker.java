@@ -1,15 +1,21 @@
 package com.luck.picture.lib.permissions;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.Settings;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * @author：luck
@@ -26,8 +32,21 @@ public class PermissionChecker {
      * @return
      */
     public static boolean checkSelfPermission(Context ctx, String permission) {
-        return ContextCompat.checkSelfPermission(ctx.getApplicationContext(), permission)
-                == PackageManager.PERMISSION_GRANTED;
+        String[] permissions = new String[]{permission};
+        if ((Manifest.permission.WRITE_EXTERNAL_STORAGE.equals(permission) ||
+                Manifest.permission.READ_EXTERNAL_STORAGE.equals(permission)) &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            //android 13
+            permissions = new String[]{Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_MEDIA_VIDEO};
+        }
+        for (String p : permissions) {
+            if (ContextCompat.checkSelfPermission(ctx.getApplicationContext(), p)
+                    == PackageManager.PERMISSION_DENIED) {
+                return false;
+            }
+        }
+        return true;
     }
 
 
@@ -38,7 +57,21 @@ public class PermissionChecker {
      * @param code
      */
     public static void requestPermissions(Activity activity, @NonNull String[] permissions, int code) {
-        ActivityCompat.requestPermissions(activity, permissions, code);
+        List<String> list = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            for (String p : permissions) {
+                if (Manifest.permission.WRITE_EXTERNAL_STORAGE.equals(p) ||
+                        Manifest.permission.READ_EXTERNAL_STORAGE.equals(p)) {
+                    list.add(Manifest.permission.READ_MEDIA_IMAGES);
+                    list.add(Manifest.permission.READ_MEDIA_VIDEO);
+                } else {
+                    list.add(p);
+                }
+            }
+        } else {
+            list.addAll(Arrays.asList(permissions));
+        }
+        ActivityCompat.requestPermissions(activity, list.toArray(new String[list.size()]), code);
     }
 
 
